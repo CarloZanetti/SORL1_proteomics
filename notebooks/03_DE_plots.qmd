@@ -205,3 +205,71 @@ for (comp in all_comparisons) {
   print(p)
 }
 ```
+
+## One-condition-missing proteins
+
+Proteins with `issue == "oneConditionMissing"` are detected only in WT *or* only
+in KO. MSstats assigns them `log2FC = ±Inf` and excludes them from the volcano
+(no finite x-coordinate). They are reported here as a separate presence/absence
+table.
+
+The number of samples in which the protein was detected (from the cleaned
+pre-imputation Spectronaut data) is shown so genuine on/off candidates (≥3 of 4
+samples in the present condition) can be separated from sparse detections that
+likely reflect noise.
+
+```{r}
+clean_meta <- fread(file.path(objects_dir, "clean_metadata.csv"))
+
+# Detection count per protein per genotype, from the cleaned (pre-imputation)
+# fragment-level data. PG.Quantity is the same for every fragment of a given
+# (sample, protein) pair, so a protein is "detected" in a sample if any row
+# has non-NA PG.Quantity.
+detection_counts <- clean_spec %>%
+  filter(!is.na(PG.Quantity)) %>%
+  distinct(PG.ProteinGroups, R.FileName) %>%
+  left_join(
+    clean_meta %>% dplyr::select(FileName, Genotype),
+    by = c("R.FileName" = "FileName")
+  ) %>%
+  group_by(PG.ProteinGroups) %>%
+  summarise(
+    n_WT = sum(Genotype == "WT"),
+    n_KO = sum(Genotype == "KO"),
+    .groups = "drop"
+  )
+
+one_cond <- res_df %>%
+  filter(issue == "oneConditionMissing") %>%
+  left_join(protein_dictionary, by = "Protein") %>%
+  left_join(detection_counts, by = c("Protein" = "PG.ProteinGroups")) %>%
+  mutate(
+    n_WT      = ifelse(is.na(n_WT), 0L, n_WT),
+    n_KO      = ifelse(is.na(n_KO), 0L, n_KO),
+    Direction = case_when(
+      log2FC ==  Inf ~ "KO-only",
+      log2FC == -Inf ~ "WT-only",
+      TRUE           ~ NA_character_
+    ),
+    n_present  = pmax(n_WT, n_KO),
+    Confidence = case_when(
+      n_present == 4 ~ "High (4/4)",
+      n_present == 3 ~ "Moderate (3/4)",
+      n_present == 2 ~ "Low (2/4)",
+      n_present == 1 ~ "Very low (1/4)",
+      TRUE           ~ "None"
+    )
+  ) %>%
+  arrange(desc(n_present), Direction, Gene) %>%
+  dplyr::select(Protein, Gene, Description, Direction,
+                n_WT, n_KO, n_present, Confidence)
+
+fwrite(one_cond, file.path(results_dir, "OneConditionMissing_KO_vs_WT.csv"))
+
+cat("Total one-condition-missing proteins:", nrow(one_cond), "\n\n")
+cat("--- Confidence × Direction ---\n")
+print(table(Confidence = one_cond$Confidence, Direction = one_cond$Direction))
+
+cat("\n--- High & moderate confidence candidates (≥3/4 detection) ---\n")
+print(one_cond %>% filter(n_present >= 3))
+```

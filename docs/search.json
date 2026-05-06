@@ -1,5 +1,33 @@
 [
   {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "SORL1 Microglia Proteomics",
+    "section": "",
+    "text": "Total proteomics of human iPSC-derived microglia xenografted into App NL-G-F Alzheimer’s disease mice. Microglia were FACS-sorted as cell pellets and searched against the human proteome (S5 batch, Spectronaut). The primary comparison is SORL1 KO vs WT (n = 4 per genotype)."
+  },
+  {
+    "objectID": "index.html#overview",
+    "href": "index.html#overview",
+    "title": "SORL1 Microglia Proteomics",
+    "section": "",
+    "text": "Total proteomics of human iPSC-derived microglia xenografted into App NL-G-F Alzheimer’s disease mice. Microglia were FACS-sorted as cell pellets and searched against the human proteome (S5 batch, Spectronaut). The primary comparison is SORL1 KO vs WT (n = 4 per genotype)."
+  },
+  {
+    "objectID": "index.html#sample-table",
+    "href": "index.html#sample-table",
+    "title": "SORL1 Microglia Proteomics",
+    "section": "Sample Table",
+    "text": "Sample Table\n\n\n\n\n\n\n\n\n\n\n\n\nShortName\nR.FileName\nMouse ID\nSex\nSORL1\nApp\nCell Count\n\n\n\n\nBDAG171.1c\nds12_S5-A1_1_6411\nBDAG171.1c\nMale\nWT\nNL-G-F\n154,300\n\n\nBDAG171.1d\nds11_S5-A2_1_6412\nBDAG171.1d\nMale\nWT\nNL-G-F\n143,900\n\n\nBDAG171.1a\nds22_S5-A3_1_6413\nBDAG171.1a\nMale\nWT\nNL-G-F\n463,400\n\n\nBDAG171.1b\nds21_S5-A4_1_6414\nBDAG171.1b\nMale\nWT\nNL-G-F\n69,340\n\n\nBDAG173.1e\nds51_S5-A9_1_6421\nBDAG173.1e\nFemale\nKO\nNL-G-F\n141,800\n\n\nBDAG173.1f\nds51_S5-A10_1_6422\nBDAG173.1f\nFemale\nKO\nNL-G-F\n209,800\n\n\nBDAG173.1b\nds61_S5-A11_1_6423\nBDAG173.1b\nMale\nKO\nNL-G-F\n95,890\n\n\nBDAG173.1a\nds62_S5-A12_1_6424\nBDAG173.1a\nMale\nKO\nNL-G-F\n237,400\n\n\n\n\nNote on sex balance: WT samples are all Male; KO samples are 2 Female + 2 Male (BDAG173 cohort). The MSstats linear model is fitted on genotype group only — sex is not modelled as a covariate. Results should be interpreted with this confound in mind."
+  },
+  {
+    "objectID": "index.html#notebooks",
+    "href": "index.html#notebooks",
+    "title": "SORL1 Microglia Proteomics",
+    "section": "Notebooks",
+    "text": "Notebooks\n\n\n\nNotebook\nDescription\n\n\n\n\n1. QC\nSample QC, PCA, correlation heatmap, missing value diagnostics\n\n\n2. MSstats\nFragment-level filtering, TMP summarisation, WT vs KO differential abundance\n\n\n3. DE Plots\nVolcano plots and DE tables with gene annotation"
+  },
+  {
     "objectID": "notebooks/01_initial_qc.html",
     "href": "notebooks/01_initial_qc.html",
     "title": "Initial QC & Data Cleaning — Dom Proteomics (SORL1 xenograft microglia)",
@@ -271,5 +299,54 @@
     "title": "3. DE Plots",
     "section": "Generate volcano plots",
     "text": "Generate volcano plots\n\n\nCode\nall_comparisons &lt;- unique(res_df$Label)\nplot_list       &lt;- list()\n\nfor (comp in all_comparisons) {\n  p &lt;- generate_swanky_volcano(\n    msstats_results  = res_df,\n    dict             = protein_dictionary,\n    comparison_label = comp,\n    logfc_cutoff     = 0.5,\n    graphs_dir       = results_dir\n  )\n  plot_list[[comp]] &lt;- p\n  print(p)\n}\n\n\nWarning: Removed 12470 rows containing missing values or values outside the scale range\n(`geom_label_repel()`).\nRemoved 12470 rows containing missing values or values outside the scale range\n(`geom_label_repel()`)."
+  },
+  {
+    "objectID": "notebooks/03_DE_plots.html#one-condition-missing-proteins",
+    "href": "notebooks/03_DE_plots.html#one-condition-missing-proteins",
+    "title": "3. DE Plots",
+    "section": "One-condition-missing proteins",
+    "text": "One-condition-missing proteins\nProteins with issue == \"oneConditionMissing\" are detected only in WT or only in KO. MSstats assigns them log2FC = ±Inf and excludes them from the volcano (no finite x-coordinate). They are reported here as a separate presence/absence table.\nThe number of samples in which the protein was detected (from the cleaned pre-imputation Spectronaut data) is shown so genuine on/off candidates (≥3 of 4 samples in the present condition) can be separated from sparse detections that likely reflect noise.\n\n\nCode\nclean_meta &lt;- fread(file.path(objects_dir, \"clean_metadata.csv\"))\n\n# Detection count per protein per genotype, from the cleaned (pre-imputation)\n# fragment-level data. PG.Quantity is the same for every fragment of a given\n# (sample, protein) pair, so a protein is \"detected\" in a sample if any row\n# has non-NA PG.Quantity.\ndetection_counts &lt;- clean_spec %&gt;%\n  filter(!is.na(PG.Quantity)) %&gt;%\n  distinct(PG.ProteinGroups, R.FileName) %&gt;%\n  left_join(\n    clean_meta %&gt;% dplyr::select(FileName, Genotype),\n    by = c(\"R.FileName\" = \"FileName\")\n  ) %&gt;%\n  group_by(PG.ProteinGroups) %&gt;%\n  summarise(\n    n_WT = sum(Genotype == \"WT\"),\n    n_KO = sum(Genotype == \"KO\"),\n    .groups = \"drop\"\n  )\n\none_cond &lt;- res_df %&gt;%\n  filter(issue == \"oneConditionMissing\") %&gt;%\n  left_join(protein_dictionary, by = \"Protein\") %&gt;%\n  left_join(detection_counts, by = c(\"Protein\" = \"PG.ProteinGroups\")) %&gt;%\n  mutate(\n    n_WT      = ifelse(is.na(n_WT), 0L, n_WT),\n    n_KO      = ifelse(is.na(n_KO), 0L, n_KO),\n    Direction = case_when(\n      log2FC ==  Inf ~ \"KO-only\",\n      log2FC == -Inf ~ \"WT-only\",\n      TRUE           ~ NA_character_\n    ),\n    n_present  = pmax(n_WT, n_KO),\n    Confidence = case_when(\n      n_present == 4 ~ \"High (4/4)\",\n      n_present == 3 ~ \"Moderate (3/4)\",\n      n_present == 2 ~ \"Low (2/4)\",\n      n_present == 1 ~ \"Very low (1/4)\",\n      TRUE           ~ \"None\"\n    )\n  ) %&gt;%\n  arrange(desc(n_present), Direction, Gene) %&gt;%\n  dplyr::select(Protein, Gene, Description, Direction,\n                n_WT, n_KO, n_present, Confidence)\n\nfwrite(one_cond, file.path(results_dir, \"OneConditionMissing_KO_vs_WT.csv\"))\n\ncat(\"Total one-condition-missing proteins:\", nrow(one_cond), \"\\n\\n\")\n\n\nTotal one-condition-missing proteins: 30 \n\n\nCode\ncat(\"--- Confidence × Direction ---\\n\")\n\n\n--- Confidence × Direction ---\n\n\nCode\nprint(table(Confidence = one_cond$Confidence, Direction = one_cond$Direction))\n\n\n                Direction\nConfidence       KO-only WT-only\n  High (4/4)           1       2\n  Moderate (3/4)       1      10\n  None                10       6\n\n\nCode\ncat(\"\\n--- High & moderate confidence candidates (≥3/4 detection) ---\\n\")\n\n\n\n--- High & moderate confidence candidates (≥3/4 detection) ---\n\n\nCode\nprint(one_cond %&gt;% filter(n_present &gt;= 3))\n\n\n                 Protein    Gene                                  Description\n                  &lt;char&gt;  &lt;char&gt;                                       &lt;char&gt;\n 1:               O00519    FAAH                   fatty acid amide hydrolase\n 2:               P48455  P48455                      Uncharacterized protein\n 3:               Q8CDC0  Q8CDC0                      Uncharacterized protein\n 4:               Q86SQ9   DHDDS dehydrodolichyl diphosphate synthase subunit\n 5:               Q96L46  CAPNS2                      calpain small subunit 2\n 6:               Q5J8M3    EMC4        ER membrane protein complex subunit 4\n 7:               Q96DR8   MUCL1                                 mucin like 1\n 8:               Q15021  NCAPD2       non-SMC condensin I complex subunit D2\n 9:               P12388  P12388                      Uncharacterized protein\n10: P70694;Q8K023;Q91WR5  P70694                      Uncharacterized protein\n11:               P40967    PMEL                        premelanosome protein\n12:               Q497I4  Q497I4                      Uncharacterized protein\n13:               Q8BND5  Q8BND5                      Uncharacterized protein\n14:               Q86SG5 S100A7A             S100 calcium binding protein A7A\n    Direction  n_WT  n_KO n_present     Confidence\n       &lt;char&gt; &lt;int&gt; &lt;int&gt;     &lt;int&gt;         &lt;char&gt;\n 1:   KO-only     0     4         4     High (4/4)\n 2:   WT-only     3     4         4     High (4/4)\n 3:   WT-only     4     0         4     High (4/4)\n 4:   KO-only     0     3         3 Moderate (3/4)\n 5:   WT-only     3     0         3 Moderate (3/4)\n 6:   WT-only     3     0         3 Moderate (3/4)\n 7:   WT-only     3     0         3 Moderate (3/4)\n 8:   WT-only     3     0         3 Moderate (3/4)\n 9:   WT-only     3     1         3 Moderate (3/4)\n10:   WT-only     3     0         3 Moderate (3/4)\n11:   WT-only     3     0         3 Moderate (3/4)\n12:   WT-only     3     0         3 Moderate (3/4)\n13:   WT-only     3     1         3 Moderate (3/4)\n14:   WT-only     3     0         3 Moderate (3/4)"
+  },
+  {
+    "objectID": "sample_metadata.html",
+    "href": "sample_metadata.html",
+    "title": "",
+    "section": "",
+    "text": "Code"
+  },
+  {
+    "objectID": "sample_metadata.html#experiment",
+    "href": "sample_metadata.html#experiment",
+    "title": "",
+    "section": "Experiment",
+    "text": "Experiment\nHuman iPSC-derived microglia xenografted into App NL-G-F Alzheimer’s disease mice. Microglia FACS-sorted as cell pellets; SORL1 genotype WT or KO (HET not in this batch).\n\nSource metadata: /camp/home/zanettc/home/shared/0simpsod/Proteomics/2026_04_25_sorl1_xenograft_microglia_bulk_proteomics/ips_microglia_xenograft_proteomics_metadata.csv\nPrimary file (run1 QC): 20260423_094931_S5-A10_Report_human.tsv — S5 batch, 8 samples, searched against human proteome\nInput alias: /nemo/lab/destrooperb/home/shared/zanettc/dom_proteomics/data/inputs/2026_04_23_SORL1_mg_total_proteomics\nOriginal data path: /camp/home/zanettc/home/data/STPs/proteomics/inputs/Dom/2026_04_23_SORL1_mg_total_proteomics"
+  },
+  {
+    "objectID": "sample_metadata.html#sample-table-s5-batch-exp1.1-cohort-run1-qc",
+    "href": "sample_metadata.html#sample-table-s5-batch-exp1.1-cohort-run1-qc",
+    "title": "",
+    "section": "Sample table — S5 batch (EXP1.1 cohort, run1 QC)",
+    "text": "Sample table — S5 batch (EXP1.1 cohort, run1 QC)\n\n\n\n\n\n\n\n\n\n\n\n\nShortName\nR.FileName\nMouse_ID\nSex\nSORL1 Genotype\nApp Genotype\nCellCount\n\n\n\n\nBDAG171.1c\nds12_S5-A1_1_6411\nBDAG171.1c\nMale\nWT\nNL-G-F\n154,300\n\n\nBDAG171.1d\nds11_S5-A2_1_6412\nBDAG171.1d\nMale\nWT\nNL-G-F\n143,900\n\n\nBDAG171.1a\nds22_S5-A3_1_6413\nBDAG171.1a\nMale\nWT\nNL-G-F\n463,400\n\n\nBDAG171.1b\nds21_S5-A4_1_6414\nBDAG171.1b\nMale\nWT\nNL-G-F\n69,340\n\n\nBDAG173.1e\nds51_S5-A9_1_6421\nBDAG173.1e\nFemale\nKO\nNL-G-F\n141,800\n\n\nBDAG173.1f\nds51_S5-A10_1_6422\nBDAG173.1f\nFemale\nKO\nNL-G-F\n209,800\n\n\nBDAG173.1b\nds61_S5-A11_1_6423\nBDAG173.1b\nMale\nKO\nNL-G-F\n95,890\n\n\nBDAG173.1a\nds62_S5-A12_1_6424\nBDAG173.1a\nMale\nKO\nNL-G-F\n237,400\n\n\n\nWT: BDAG171 mice (all Male, EXP1.1)\nKO: BDAG173 mice (2 Male + 2 Female, EXP1.1)"
+  },
+  {
+    "objectID": "sample_metadata.html#naming-discrepancies-in-source-data",
+    "href": "sample_metadata.html#naming-discrepancies-in-source-data",
+    "title": "",
+    "section": "Naming discrepancies (in source data)",
+    "text": "Naming discrepancies (in source data)\n\nBDAG173.1f / ds52: Study metadata lists prefix ds52 and plate well A10, but Spectronaut recorded this sample as ds51_S5-A10_1_6422. Both “ds51” entries are disambiguated in the notebook by their full FileName (plate position).\nBDAG173.1a/1b plate wells: Metadata lists ds62→A11 and ds61→A12, but filenames show ds62→A12 and ds61→A11. Matched by Sample_file_prefix column in the metadata CSV."
+  },
+  {
+    "objectID": "sample_metadata.html#samples-not-in-this-file-het-cohort-exp1.2",
+    "href": "sample_metadata.html#samples-not-in-this-file-het-cohort-exp1.2",
+    "title": "",
+    "section": "Samples NOT in this file (HET cohort, EXP1.2)",
+    "text": "Samples NOT in this file (HET cohort, EXP1.2)\n\n\n\nMouse_ID\nSex\nSORL1 Genotype\nMetadata prefix\n\n\n\n\nBDAG174.1a\nMale\nHET\nds32\n\n\nBDAG174.1b\nMale\nHET\nds31\n\n\nBDAG174.1c\nMale\nHET\nds42\n\n\nBDAG174.1d\nMale\nHET\nds41\n\n\n\nAlso in the data folder: 20260423_151654_49982.d_Report.tsv (S4 batch, 17 samples with explicit wt/het/ko labels — separate experiment or earlier run, not analysed in run1)."
+  },
+  {
+    "objectID": "sample_metadata.html#notes",
+    "href": "sample_metadata.html#notes",
+    "title": "",
+    "section": "Notes",
+    "text": "Notes\n\nAll samples stored at -70°C; frozen ~6 months prior to proteomics.\nResidual buffer: PBS + 2% BSA + 2 mM EDTA (FACS buffer).\nBDAG171.1b has very low cell count (69,340) — watch for elevated % missing.\nDownstream differential analysis: WT vs KO comparison (n=4 per genotype, sex is a potential confound given KO has mixed sex)."
   }
 ]
