@@ -1,0 +1,19 @@
+# Raw and processed data (large files, not for version control)
+data/
+
+# Serialised R objects
+*.qs2
+
+# Quarto internals (freeze/ should be committed for reproducible renders)
+/.quarto/
+
+# R session artefacts
+.Rhistory
+.RData
+
+# SLURM logs
+logs/
+
+# OS
+.DS_Store
+*~

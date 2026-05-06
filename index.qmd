@@ -1,0 +1,30 @@
+---
+title: "SORL1 Microglia Proteomics"
+---
+
+## Overview
+
+Total proteomics of human iPSC-derived microglia xenografted into App NL-G-F Alzheimer's disease mice. Microglia were FACS-sorted as cell pellets and searched against the human proteome (S5 batch, Spectronaut). The primary comparison is **SORL1 KO vs WT** (n = 4 per genotype).
+
+## Sample Table
+
+| ShortName  | R.FileName             | Mouse ID   | Sex    | SORL1  | App      | Cell Count |
+|------------|------------------------|------------|--------|--------|----------|------------|
+| BDAG171.1c | ds12_S5-A1_1_6411      | BDAG171.1c | Male   | WT     | NL-G-F   | 154,300    |
+| BDAG171.1d | ds11_S5-A2_1_6412      | BDAG171.1d | Male   | WT     | NL-G-F   | 143,900    |
+| BDAG171.1a | ds22_S5-A3_1_6413      | BDAG171.1a | Male   | WT     | NL-G-F   | 463,400    |
+| BDAG171.1b | ds21_S5-A4_1_6414      | BDAG171.1b | Male   | WT     | NL-G-F   | 69,340     |
+| BDAG173.1e | ds51_S5-A9_1_6421      | BDAG173.1e | Female | KO     | NL-G-F   | 141,800    |
+| BDAG173.1f | ds51_S5-A10_1_6422     | BDAG173.1f | Female | KO     | NL-G-F   | 209,800    |
+| BDAG173.1b | ds61_S5-A11_1_6423     | BDAG173.1b | Male   | KO     | NL-G-F   | 95,890     |
+| BDAG173.1a | ds62_S5-A12_1_6424     | BDAG173.1a | Male   | KO     | NL-G-F   | 237,400    |
+
+> **Note on sex balance:** WT samples are all Male; KO samples are 2 Female + 2 Male (BDAG173 cohort). The MSstats linear model is fitted on genotype group only — sex is not modelled as a covariate. Results should be interpreted with this confound in mind.
+
+## Notebooks
+
+| Notebook | Description |
+|----------|-------------|
+| [1. QC](notebooks/01_initial_qc.qmd) | Sample QC, PCA, correlation heatmap, missing value diagnostics |
+| [2. MSstats](notebooks/02_msstats.qmd) | Fragment-level filtering, TMP summarisation, WT vs KO differential abundance |
+| [3. DE Plots](notebooks/03_DE_plots.qmd) | Volcano plots and DE tables with gene annotation |

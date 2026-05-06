@@ -1,0 +1,38 @@
+INFO  [2026-05-06 10:28:46] MSstats - dataProcess function
+INFO  [2026-05-06 10:28:46] Summary method: TMP
+INFO  [2026-05-06 10:28:46] censoredInt: NA
+INFO  [2026-05-06 10:28:52] ** Features with one or two measurements across runs are removed.
+INFO  [2026-05-06 10:28:52] ** Fractionation handled.
+INFO  [2026-05-06 10:28:57] ** Updated quantification data to make balanced design. Missing values are marked by NA
+INFO  [2026-05-06 10:28:57] 
+
+INFO  [2026-05-06 10:29:00] Logarithm transformation with base 2 is done
+INFO  [2026-05-06 10:29:03] Factorize in columns(GROUP, SUBJECT, GROUP_ORIGINAL, SUBJECT_ORIGINAL, FEATURE, RUN)
+Normalization based on median: OK [2026-05-06 10:29:03] 
+INFO  [2026-05-06 10:29:04] ** Log2 intensities under cutoff = -3.0224  were considered as censored missing values.
+INFO  [2026-05-06 10:29:04] ** Log2 intensities = NA were considered as censored missing values.
+INFO  [2026-05-06 10:34:34] ** Flag uninformative feature and outliers by feature selection algorithm.
+INFO  [2026-05-06 10:34:35] 
+ # proteins: 12515
+ # peptides per protein: 1-310
+ # features per peptide: 1-6
+INFO  [2026-05-06 10:34:35] Some proteins have only one feature: 
+ A0A1W2PQ72,
+ O43548,
+ O75438,
+ O75569,
+ P04919 ...
+INFO  [2026-05-06 10:34:35] 
+                    KO WT
+             # runs  4  4
+    # bioreplicates  4  4
+ # tech. replicates  1  1
+INFO  [2026-05-06 10:34:36] Some features are completely missing in at least one condition:  
+ AADLLLHSK_2_y3_1,
+ AADLLLHSK_2_y4_1,
+ AADLLLHSK_2_y5_1,
+ AAEEGKDYPFAR_3_y3_1,
+ AAEEGKDYPFAR_3_y4_1 ...
+INFO  [2026-05-06 10:34:36] == Start the summarization per subplot...
+INFO  [2026-05-06 10:34:36] ** Filtered out uninformative features and outliers.
+INFO  [2026-05-06 10:38:33] == Summarization is done.

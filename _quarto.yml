@@ -1,0 +1,30 @@
+project:
+  type: website
+  output-dir: docs
+
+execute:
+  freeze: auto
+
+website:
+  title: "SORL1 Microglia Proteomics"
+  repo-url: https://github.com/CarloZanetti/SORL1_proteomics
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: notebooks/01_initial_qc.qmd
+        text: "1. QC"
+      - href: notebooks/02_msstats.qmd
+        text: "2. MSstats"
+      - href: notebooks/03_DE_plots.qmd
+        text: "3. DE Plots"
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    code-fold: true
+    code-tools: true
+    fig-width: 10
+    fig-height: 7

@@ -1,0 +1,207 @@
+---
+title: "3. DE Plots"
+---
+
+## Libraries
+
+```{r setup, include=FALSE, message=FALSE}
+library(data.table)
+library(qs2)
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(MSstats)
+library(stringr)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+```
+
+## Directories
+
+```{r}
+base_dir    <- "/nemo/lab/destrooperb/home/shared/zanettc/dom_proteomics"
+run_num     <- "run1"
+
+results_dir <- file.path(base_dir, "results", run_num)
+objects_dir <- file.path(base_dir, "data", "processed", run_num)
+
+dir.create(results_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(objects_dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Read MSstats results
+
+```{r}
+res_df <- fread(file.path(results_dir, "Full_GroupComparison_Results.csv"))
+```
+
+## Build protein dictionary
+
+Map UniProt accessions to gene symbols and descriptions using the human annotation
+database. The primary accession (first in a semicolon-separated group) is used as
+the lookup key.
+
+```{r}
+clean_spec <- fread(file.path(objects_dir, "clean_spec_dom.csv"))
+
+protein_dictionary <- clean_spec %>%
+  dplyr::select(Protein = PG.ProteinGroups,
+                Accession = PG.ProteinAccessions) %>%
+  distinct() %>%
+  mutate(Primary_Accession = str_extract(Accession, "^[^;]+"))
+
+cat("Mapping genes and descriptions (org.Hs.eg.db)...\n")
+
+protein_dictionary$Gene <- mapIds(
+  x       = org.Hs.eg.db,
+  keys    = protein_dictionary$Primary_Accession,
+  column  = "SYMBOL",
+  keytype = "UNIPROT",
+  multiVals = "first"
+)
+
+protein_dictionary$Description <- mapIds(
+  x       = org.Hs.eg.db,
+  keys    = protein_dictionary$Primary_Accession,
+  column  = "GENENAME",
+  keytype = "UNIPROT",
+  multiVals = "first"
+)
+
+protein_dictionary <- protein_dictionary %>%
+  mutate(
+    Gene        = ifelse(is.na(Gene),        Primary_Accession,        Gene),
+    Description = ifelse(is.na(Description), "Uncharacterized protein", Description)
+  ) %>%
+  dplyr::select(-Primary_Accession)
+
+fwrite(protein_dictionary, file.path(objects_dir, "protein_dictionary.csv"))
+cat("Dictionary written:", nrow(protein_dictionary), "entries\n")
+```
+
+## Volcano plot function
+
+FDR threshold: 0.05. Fold-change threshold: ±0.5 log2FC (configurable).
+Top 20 significant genes per direction are labelled, ranked by FDR.
+
+```{r}
+volcano_cols <- c(
+  "Upregulated"     = "firebrick3",
+  "Downregulated"   = "navy",
+  "Not Significant" = "grey80"
+)
+
+generate_swanky_volcano <- function(msstats_results, dict, comparison_label,
+                                    logfc_cutoff = 0.5, graphs_dir = "results") {
+  volcano_data <- msstats_results %>%
+    filter(Label == comparison_label, !is.na(adj.pvalue), is.finite(log2FC)) %>%
+    left_join(dict, by = "Protein") %>%
+    mutate(
+      Gene   = ifelse(is.na(Gene) | Gene == "", Protein, Gene),
+      Status = case_when(
+        adj.pvalue < 0.05 & log2FC >  logfc_cutoff ~ "Upregulated",
+        adj.pvalue < 0.05 & log2FC < -logfc_cutoff ~ "Downregulated",
+        TRUE                                        ~ "Not Significant"
+      )
+    ) %>%
+    group_by(Status) %>%
+    mutate(GroupRank = rank(adj.pvalue, ties.method = "first")) %>%
+    ungroup() %>%
+    mutate(
+      PlotLabel = case_when(
+        Status != "Not Significant" & GroupRank <= 20 ~ Gene,
+        TRUE                                          ~ NA_character_
+      )
+    )
+
+  p <- ggplot(volcano_data,
+              aes(x = log2FC, y = -log10(adj.pvalue),
+                  fill = Status, color = Status)) +
+    geom_point(aes(size = Status, alpha = Status), shape = 21, stroke = 0.2) +
+    scale_fill_manual(values = volcano_cols) +
+    scale_color_manual(values = c(
+      "Upregulated"     = "black",
+      "Downregulated"   = "black",
+      "Not Significant" = "grey90"
+    )) +
+    scale_size_manual(values = c(
+      "Upregulated"     = 3,
+      "Downregulated"   = 3,
+      "Not Significant" = 1.5
+    )) +
+    scale_alpha_manual(values = c(
+      "Upregulated"     = 1,
+      "Downregulated"   = 1,
+      "Not Significant" = 0.3
+    )) +
+    geom_hline(yintercept = -log10(0.05),
+               linetype = "dashed", color = "grey30", linewidth = 0.8) +
+    geom_vline(xintercept = c(-logfc_cutoff, logfc_cutoff),
+               linetype = "dashed", color = "grey30", linewidth = 0.8) +
+    geom_label_repel(
+      aes(label = PlotLabel),
+      fill = "white", color = "black", fontface = "bold", size = 3.5,
+      box.padding = 0.5, point.padding = 0.5,
+      min.segment.length = 0, segment.color = "grey50", max.overlaps = 50
+    ) +
+    labs(
+      title    = paste0("Differential Abundance: ", gsub("_", " ", comparison_label)),
+      subtitle = paste0("Top 20 Genes Labeled | FDR < 0.05 | |log2FC| > ", logfc_cutoff),
+      x        = bquote(bold("Log"[2] ~ "Fold Change")),
+      y        = bquote(bold("-Log"[10] ~ "FDR"))
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      plot.title       = element_text(face = "bold", size = 18, hjust = 0),
+      plot.subtitle    = element_text(size = 12, color = "grey40",
+                                      margin = margin(b = 10)),
+      axis.title       = element_text(face = "bold", size = 14),
+      axis.text        = element_text(face = "bold", color = "black"),
+      axis.line        = element_line(color = "black", linewidth = 1),
+      axis.ticks       = element_line(color = "black", linewidth = 1),
+      legend.position  = "top",
+      legend.title     = element_blank(),
+      legend.text      = element_text(size = 12, face = "bold"),
+      panel.grid.minor = element_blank(),
+      panel.grid.major = element_line(color = "grey95")
+    )
+
+  dir.create(graphs_dir, showWarnings = FALSE, recursive = TRUE)
+  safe_name <- gsub(" ", "_", comparison_label)
+
+  ggsave(
+    filename = file.path(graphs_dir, paste0("Volcano_", safe_name, ".pdf")),
+    plot     = p,
+    width    = 10, height = 7, dpi = 300,
+    device   = cairo_pdf
+  )
+
+  export_data <- volcano_data %>%
+    dplyr::select(Protein, Gene, Description, log2FC, pvalue, adj.pvalue, Status) %>%
+    arrange(adj.pvalue)
+
+  fwrite(export_data,
+         file = file.path(graphs_dir, paste0("Volcano_Data_", safe_name, ".csv")))
+
+  return(p)
+}
+```
+
+## Generate volcano plots
+
+```{r}
+all_comparisons <- unique(res_df$Label)
+plot_list       <- list()
+
+for (comp in all_comparisons) {
+  p <- generate_swanky_volcano(
+    msstats_results  = res_df,
+    dict             = protein_dictionary,
+    comparison_label = comp,
+    logfc_cutoff     = 0.5,
+    graphs_dir       = results_dir
+  )
+  plot_list[[comp]] <- p
+  print(p)
+}
+```

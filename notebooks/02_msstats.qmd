@@ -1,0 +1,252 @@
+---
+title: "2. MSstats — Differential Abundance Analysis"
+---
+
+## Libraries
+
+```{r setup, include=TRUE, message=FALSE}
+library(data.table)
+library(MSstats)
+library(qs2)
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(tidyverse)
+library(readr)
+```
+
+## Set directories
+
+```{r}
+base_dir    <- "/nemo/lab/destrooperb/home/shared/zanettc/dom_proteomics"
+run_num     <- "run1"
+
+results_dir <- file.path(base_dir, "results", run_num)
+objects_dir <- file.path(base_dir, "data", "processed", run_num)
+input_dir   <- file.path(base_dir, "data", "inputs",
+                         "2026_04_23_SORL1_mg_total_proteomics")
+
+dir.create(results_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(objects_dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+## Build annotation from study design
+
+All 8 samples passed QC. R.Condition in the raw file is "Not Defined" — we assign
+WT/KO here from the known sample table.
+
+Note: WT samples are all Male (BDAG171 cohort); KO samples are 2 Female + 2 Male
+(BDAG173 cohort). Sex is not modelled as a covariate in the MSstats linear model —
+the KO vs WT contrast is therefore partially confounded with sex.
+
+```{r}
+msstats_annotation <- data.table(
+  Run = c(
+    "ds12_S5-A1_1_6411", "ds11_S5-A2_1_6412",
+    "ds22_S5-A3_1_6413", "ds21_S5-A4_1_6414",
+    "ds51_S5-A9_1_6421", "ds51_S5-A10_1_6422",
+    "ds61_S5-A11_1_6423", "ds62_S5-A12_1_6424"
+  ),
+  Condition    = c(rep("WT", 4), rep("KO", 4)),
+  BioReplicate = 1:8
+)
+
+msstats_annotation
+
+fwrite(msstats_annotation, file.path(objects_dir, "msstats_annotation.csv"))
+```
+
+## Load raw Spectronaut report
+
+Select only the fragment-level columns required by MSstats to keep memory manageable.
+
+```{r}
+msstats_cols <- c(
+  "R.Condition", "R.FileName", "R.Replicate",
+  "PG.ProteinGroups", "PG.ProteinAccessions",
+  "PEP.StrippedSequence",
+  "EG.ModifiedSequence", "EG.PrecursorId", "EG.Qvalue",
+  "FG.Charge", "FG.Id",
+  "F.FrgIon", "F.Charge", "F.FrgLossType", "F.FrgNum", "F.FrgType",
+  "F.NormalizedPeakArea", "F.PeakArea", "F.ExcludedFromQuantification"
+)
+
+cat("Reading Spectronaut report...\n")
+raw_spectronaut <- fread(
+  file.path(input_dir, "20260423_094931_S5-A10_Report_human.tsv"),
+  select = msstats_cols
+)
+cat("Rows loaded:", nrow(raw_spectronaut), "\n")
+
+qs_save(raw_spectronaut, file.path(objects_dir, "msstats_report.qs2"))
+```
+
+## Reload from .qs2 (skip read on re-runs)
+
+```{r eval=FALSE}
+raw_spectronaut <- qs_read(file.path(objects_dir, "msstats_report.qs2"))
+```
+
+## Overwrite R.Condition and R.Replicate with study design values
+
+```{r}
+raw_spectronaut[msstats_annotation,
+                on = c("R.FileName" = "Run"),
+                `:=`(R.Condition = i.Condition,
+                     R.Replicate = i.BioReplicate)]
+
+cat("Condition distribution after fix:\n")
+print(raw_spectronaut[, .N, by = .(R.Condition, R.FileName)][order(R.Condition, R.FileName)])
+```
+
+## Convert to MSstats input format
+
+Feature-level filtering: Qvalue < 0.01, remove features with too few measurements.
+
+```{r}
+msstats_input <- suppressWarnings(SpectronauttoMSstatsFormat(
+  raw_spectronaut,
+  annotation                 = msstats_annotation,
+  filter_with_Qvalue         = TRUE,
+  qvalue_cutoff              = 0.01,
+  fewMeasurements            = "remove",
+  removeProtein_with1Feature = FALSE
+))
+
+cat("MSstats input rows:", nrow(msstats_input), "\n")
+cat("Unique proteins:   ", uniqueN(msstats_input$ProteinName), "\n")
+
+qs_save(msstats_input, file.path(objects_dir, "msstats_input.qs2"))
+```
+
+## Feature completeness filter
+
+Keep features observed in ≥50% of runs within at least one condition
+(≥ 2 of 4 samples in WT or ≥ 2 of 4 samples in KO).
+
+```{r eval=FALSE}
+# Manual resume — skip rebuild on re-run
+msstats_input <- qs_read(file.path(objects_dir, "msstats_input.qs2"))
+```
+
+```{r}
+msstats_input_filt <- as.data.frame(msstats_input) %>%
+  group_by(ProteinName, PeptideSequence, PrecursorCharge,
+           FragmentIon, ProductCharge, Condition) %>%
+  summarise(
+    n_obs   = sum(!is.na(Intensity) & Intensity > 0),
+    n_total = n(),
+    prop    = n_obs / n_total,
+    .groups = "drop"
+  ) %>%
+  group_by(ProteinName, PeptideSequence, PrecursorCharge,
+           FragmentIon, ProductCharge) %>%
+  filter(any(prop >= 0.5)) %>%
+  ungroup() %>%
+  inner_join(
+    as.data.frame(msstats_input),
+    by = c("ProteinName", "PeptideSequence", "PrecursorCharge",
+           "FragmentIon", "ProductCharge", "Condition")
+  )
+
+message("Rows before completeness filter: ", nrow(msstats_input))
+message("Rows after  completeness filter: ", nrow(msstats_input_filt))
+message("Proteins retained: ", uniqueN(msstats_input_filt$ProteinName))
+```
+
+## Data summarisation and normalisation
+
+Summarises fragment intensities to protein level with TMP, median normalisation,
+and model-based imputation for missing values.
+
+```{r}
+processed_data <- suppressWarnings(dataProcess(
+  msstats_input_filt,
+  normalization                        = "equalizeMedians",
+  summaryMethod                        = "TMP",
+  censoredInt                          = "NA",
+  MBimpute                             = TRUE,
+  featureSubset                        = "highQuality",
+  remove_uninformative_feature_outlier = TRUE
+))
+
+qs_save(processed_data, file.path(objects_dir, "processed_msstats_data.qs2"))
+```
+
+## Reload processed data (if re-running from this point)
+
+```{r eval=FALSE}
+processed_data <- qs_read(file.path(objects_dir, "processed_msstats_data.qs2"))
+```
+
+## Verify condition levels
+
+MSstats sorts conditions alphabetically — confirm the order before building the
+contrast matrix. Expected: "KO" then "WT".
+
+```{r}
+condition_levels <- levels(processed_data$ProteinLevelData$GROUP)
+cat("Condition levels (alphabetical):\n")
+print(condition_levels)
+```
+
+## Build contrast matrix
+
+Single comparison: KO vs WT. Positive log2FC = higher abundance in KO.
+
+```{r}
+make_contrast <- function(numerator, denominator, levels) {
+  v <- setNames(rep(0L, length(levels)), levels)
+  v[numerator]   <-  1L
+  v[denominator] <- -1L
+  v
+}
+
+comparison_matrix <- rbind(
+  make_contrast("KO", "WT", condition_levels)
+)
+rownames(comparison_matrix) <- "KO_vs_WT"
+
+print(comparison_matrix)
+```
+
+## Statistical modelling
+
+Linear mixed-effects model across all proteins.
+
+```{r}
+test_results <- suppressWarnings(
+  groupComparison(contrast.matrix = comparison_matrix, data = processed_data)
+)
+
+qs_save(test_results, file.path(objects_dir, "comparison_results.qs2"))
+
+res_df <- as.data.table(test_results$ComparisonResult)
+cat("Total protein-comparison rows:", nrow(res_df), "\n")
+cat("Significant (adj.pvalue < 0.05):",
+    nrow(res_df[adj.pvalue < 0.05, ]), "\n")
+
+fwrite(res_df, file.path(results_dir, "Full_GroupComparison_Results.csv"))
+```
+
+## Summary of results
+
+```{r}
+res_df %>%
+  filter(!is.na(adj.pvalue)) %>%
+  group_by(Label) %>%
+  summarise(
+    n_tested = n(),
+    n_sig    = sum(adj.pvalue < 0.05, na.rm = TRUE),
+    n_up     = sum(adj.pvalue < 0.05 & log2FC > 0, na.rm = TRUE),
+    n_down   = sum(adj.pvalue < 0.05 & log2FC < 0, na.rm = TRUE),
+    .groups  = "drop"
+  )
+```
+
+## Reload comparison results (if re-running from this point)
+
+```{r eval=FALSE}
+test_results <- qs_read(file.path(objects_dir, "comparison_results.qs2"))
+res_df       <- as.data.table(test_results$ComparisonResult)
+```
