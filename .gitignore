@@ -1,6 +1,6 @@
 # Raw and processed data (large files, not for version control)
 data/
-
+sample_metadata.md
 # Serialised R objects
 *.qs2
 
@@ -13,7 +13,9 @@ data/
 
 # SLURM logs
 logs/
+render_*.log
 
 # OS
 .DS_Store
 *~
+

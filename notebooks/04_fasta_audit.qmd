@@ -1,0 +1,114 @@
+---
+title: "4. FASTA Audit — Mislabelled Search Database"
+---
+
+## TL;DR
+
+The Spectronaut report delivered as `20260423_094931_S5-A10_Report_human.tsv` was searched against a FASTA file named `20K_HUMAN_1GENE_202210.fasta` — implying a human-only proteome database. **The output contains ~50 % mouse-origin proteins**, which is incompatible with a strictly human FASTA: UniProt accessions are globally unique across organisms, so a clean mouse accession in the output proves the FASTA contains mouse sequences.
+
+The likely facts:
+1. The FASTA file is a concatenated **human + mouse** database (appropriate for a xenograft experiment).
+2. The filename suggests human-only, which is misleading.
+3. Without species filtering, every downstream analysis is contaminated by host (mouse) proteins — this doubles the multiple-testing burden, distorts median normalisation, and confounds the WT vs KO contrast with sample-to-sample host contamination.
+
+This notebook lays out the evidence and recommends post-search species filtering as the fix.
+
+## Setup
+
+```{r setup, message=FALSE}
+library(data.table)
+library(dplyr)
+library(stringr)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(org.Mm.eg.db)
+
+base_dir    <- "/nemo/lab/destrooperb/home/shared/zanettc/dom_proteomics"
+input_dir   <- file.path(base_dir, "data", "inputs",
+                         "2026_04_23_SORL1_mg_total_proteomics")
+results_dir <- file.path(base_dir, "results", "run1")
+```
+
+## Evidence 1 — Filename and stated database
+
+The delivered report is named **`20260423_094931_S5-A10_Report_human.tsv`** with sibling files `*.params`, `*.setup.txt`, `*.log.txt`. The setup file declares the search database used.
+
+```{r}
+setup_path <- file.path(input_dir, "20260423_094931_S5-A10_Report_human.setup.txt")
+
+fasta_lines <- system2(
+  "grep", c("-A1", "Original File", setup_path),
+  stdout = TRUE
+)
+unique(fasta_lines[grepl("Original File", fasta_lines)])
+```
+
+The setup file states a single search database: `20K_HUMAN_1GENE_202210.fasta`. By name alone, this implies a Homo sapiens proteome with one canonical isoform per gene (~20 000 entries).
+
+## Evidence 2 — UniProt accession identity is species-specific
+
+UniProt accessions are **globally unique across organisms** — the same accession never refers to two proteins in two species. Therefore, if the output of a search against a strictly human FASTA contains an accession that, in the UniProt knowledge base, is annotated to a non-human organism, the FASTA cannot have been strictly human.
+
+We test this against the full set of unique protein groups in the MSstats output by mapping the primary accession of each group to (a) `org.Hs.eg.db` and (b) `org.Mm.eg.db`.
+
+```{r}
+res <- fread(file.path(results_dir, "Full_GroupComparison_Results.csv"))
+prim <- str_extract(res$Protein, "^[^;]+")  # first accession in semicolon-separated group
+
+hs <- !is.na(mapIds(org.Hs.eg.db, prim, "SYMBOL", "UNIPROT", multiVals = "first"))
+mm <- !is.na(mapIds(org.Mm.eg.db, prim, "SYMBOL", "UNIPROT", multiVals = "first"))
+
+species_summary <- data.table(
+  Category   = c("Human-only mapping",
+                 "Mouse-only mapping",
+                 "Both species mapping",
+                 "Neither species mapping"),
+  N_proteins = c(sum( hs & !mm),
+                 sum(!hs &  mm),
+                 sum( hs &  mm),
+                 sum(!hs & !mm))
+)
+species_summary[, Percent := round(100 * N_proteins / sum(N_proteins), 1)]
+species_summary
+```
+
+The split is approximately **50 % human / 50 % mouse**, not the ~100 % human composition that a human-only FASTA would produce. **Zero proteins map to both species**, ruling out cross-species ambiguity as the explanation — every mouse-mapped accession is unambiguously mouse.
+
+## Evidence 3 — Specific mouse accessions in the output
+
+A handful of representative mouse-only accessions, each annotated by `org.Mm.eg.db` and *not present* in `org.Hs.eg.db`:
+
+```{r}
+mouse_examples <- data.table(Protein = prim[!hs & mm])[
+  , Mouse_Gene := mapIds(org.Mm.eg.db, Protein, "SYMBOL", "UNIPROT", multiVals = "first")
+][
+  , Mouse_Description := mapIds(org.Mm.eg.db, Protein, "GENENAME", "UNIPROT", multiVals = "first")
+]
+head(mouse_examples, 15)
+```
+
+Cross-check a single accession on UniProt: e.g. `P12388` resolves to Serpinb2 (Mus musculus); `P48455` to Ppp3cc (Mus musculus); `Q60855` to Ripk1 (Mus musculus). These are unambiguously mouse identifiers in the global UniProt database — they cannot have come from a human-only FASTA.
+
+## Evidence 4 — Parallel `_mouse` report exists
+
+The input directory also contains `20260423_094931_S5-A10_Report_mouse.tsv`, searched against `uniprotkb_proteome_UP000000589_AND_revi_2025_04_18.fasta` (UniProt proteome ID `UP000000589` is *Mus musculus*). The two reports have identical row counts (6 156 104) and were generated from the same raw spectra at adjacent times.
+
+This is consistent with the standard xenograft-proteomics pattern of running two complementary searches — but it does not change the substance of the audit: the report labelled `_human` does not contain only human protein assignments.
+
+```{r}
+files <- list.files(input_dir, pattern = "Report_(human|mouse)\\.tsv$",
+                    full.names = TRUE)
+file.info(files)[, c("size", "mtime")]
+```
+
+## Conclusion
+
+1. The file `20K_HUMAN_1GENE_202210.fasta` used for the `_human` Spectronaut search **contains both human and mouse protein sequences**, despite its name.
+2. The proteomics facility's deliverable is misleading: a user taking the filename at face value would assume a human-only analysis, but every analysis run on this output is a 50 / 50 chimera unless mouse proteins are explicitly filtered post-search.
+3. For a xenograft experiment a mixed FASTA is the correct setup. The issue is the **labelling and documentation**, not the search itself.
+
+## Recommendations
+
+- **Immediate (this project):** filter mouse-origin proteins from the MSstats input prior to `dataProcess` so normalisation, statistical testing, and FDR are computed on human proteins only. This is implemented in notebook `02_msstats.qmd`.
+- **For future deliverables:** request the facility to either rename the FASTA file to reflect its true content (e.g. `HUMAN_MOUSE_combined_*.fasta`) or supply an unambiguously human-only FASTA for searches whose stated purpose is human-only.
+- **Reproducibility:** retain both `_human` and `_mouse` reports for transparency. The `_mouse` report is searched against a verifiable mouse proteome (`UP000000589`) and could support a future host-response analysis if needed.

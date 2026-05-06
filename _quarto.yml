@@ -18,6 +18,8 @@ website:
         text: "2. MSstats"
       - href: notebooks/03_DE_plots.qmd
         text: "3. DE Plots"
+      - href: notebooks/04_fasta_audit.qmd
+        text: "4. FASTA Audit"
 
 format:
   html:

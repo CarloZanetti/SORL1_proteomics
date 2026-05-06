@@ -19,3 +19,11 @@ module load quarto
 quarto render
 
 echo "end: $(date -Is)"
+
+git add -A
+if ! git diff --cached --quiet; then
+    git commit -m "auto-render: docs (job ${SLURM_JOB_ID})"
+    git push personal main
+fi
+
+rm -f "render_${SLURM_JOB_ID}.log"
