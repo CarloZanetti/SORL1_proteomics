@@ -99,6 +99,23 @@ cat("Protein groups after  human filter:", n_pg_after,  "\n")
 cat("Mouse protein groups removed:      ", n_pg_before - n_pg_after, "\n")
 ```
 
+```{r, fig.width=5, fig.height=4}
+filter_summary <- data.frame(
+  Category = c("Human (retained)", "Mouse / other (removed)"),
+  Count    = c(n_pg_after, n_pg_before - n_pg_after)
+)
+
+ggplot(filter_summary, aes(x = Category, y = Count, fill = Category)) +
+  geom_bar(stat = "identity", width = 0.55) +
+  geom_text(aes(label = Count), vjust = -0.4, size = 4) +
+  scale_fill_manual(values = c("Human (retained)" = "#1b9e77",
+                                "Mouse / other (removed)" = "#d95f02")) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(title = "Protein groups: human filter",
+       x = NULL, y = "Protein groups")
+```
+
 ## Extract unique protein-level quantities
 
 PG.Quantity repeats for every fragment row of a protein within a sample — deduplicate to one row per protein–sample pair.
@@ -411,7 +428,7 @@ sorted_names   <- meta_sorted$ShortName
 cor_mat_sorted <- cor_mat[sorted_names, sorted_names]
 
 anno_df <- meta_sorted %>%
-  select(ShortName, Genotype, Sex) %>%
+  dplyr::select(ShortName, Genotype, Sex) %>%
   as.data.frame()
 rownames(anno_df) <- anno_df$ShortName
 anno_df$ShortName <- NULL
