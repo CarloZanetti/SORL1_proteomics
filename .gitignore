@@ -1,19 +1,21 @@
-# Raw and processed data (large files, not for version control)
+# Ignore all top-level directories except docs/ and notebooks/
 data/
-sample_metadata.md
-# Serialised R objects
-*.qs2
-
-# Quarto internals (freeze/ should be committed for reproducible renders)
+_freeze/
+results/
 /.quarto/
+
+# Misc files
+sample_metadata.md
+*.qs2
 
 # R session artefacts
 .Rhistory
 .RData
 
-# SLURM logs
+# SLURM / MSstats logs
 logs/
 render_*.log
+notebooks/MSstats_*.log
 
 # OS
 .DS_Store

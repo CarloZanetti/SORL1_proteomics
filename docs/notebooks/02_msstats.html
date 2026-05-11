@@ -161,6 +161,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#set-directories" id="toc-set-directories" class="nav-link" data-scroll-target="#set-directories">Set directories</a></li>
   <li><a href="#build-annotation-from-study-design" id="toc-build-annotation-from-study-design" class="nav-link" data-scroll-target="#build-annotation-from-study-design">Build annotation from study design</a></li>
   <li><a href="#load-raw-spectronaut-report" id="toc-load-raw-spectronaut-report" class="nav-link" data-scroll-target="#load-raw-spectronaut-report">Load raw Spectronaut report</a></li>
+  <li><a href="#filter-to-human-proteins" id="toc-filter-to-human-proteins" class="nav-link" data-scroll-target="#filter-to-human-proteins">Filter to human proteins</a></li>
   <li><a href="#reload-from-.qs2-skip-read-on-re-runs" id="toc-reload-from-.qs2-skip-read-on-re-runs" class="nav-link" data-scroll-target="#reload-from-.qs2-skip-read-on-re-runs">Reload from .qs2 (skip read on re-runs)</a></li>
   <li><a href="#overwrite-r.condition-and-r.replicate-with-study-design-values" id="toc-overwrite-r.condition-and-r.replicate-with-study-design-values" class="nav-link" data-scroll-target="#overwrite-r.condition-and-r.replicate-with-study-design-values">Overwrite R.Condition and R.Replicate with study design values</a></li>
   <li><a href="#convert-to-msstats-input-format" id="toc-convert-to-msstats-input-format" class="nav-link" data-scroll-target="#convert-to-msstats-input-format">Convert to MSstats input format</a></li>
@@ -209,7 +210,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggrepel)</span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readr)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readr)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(AnnotationDbi)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(org.Hs.eg.db)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 </section>
@@ -219,7 +222,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>base_dir    <span class="ot">&lt;-</span> <span class="st">"/nemo/lab/destrooperb/home/shared/zanettc/dom_proteomics"</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>run_num     <span class="ot">&lt;-</span> <span class="st">"run1"</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>run_num     <span class="ot">&lt;-</span> <span class="st">"run2"</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>results_dir <span class="ot">&lt;-</span> <span class="fu">file.path</span>(base_dir, <span class="st">"results"</span>, run_num)</span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>objects_dir <span class="ot">&lt;-</span> <span class="fu">file.path</span>(base_dir, <span class="st">"data"</span>, <span class="st">"processed"</span>, run_num)</span>
@@ -301,9 +304,51 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="cell-output cell-output-stdout">
 <pre><code>Rows loaded: 6156104 </code></pre>
 </div>
+</div>
+</section>
+<section id="filter-to-human-proteins" class="level2">
+<h2 class="anchored" data-anchor-id="filter-to-human-proteins">Filter to human proteins</h2>
+<p>The Spectronaut search used a concatenated human + mouse FASTA (see notebook 04). Retain only rows whose primary protein group accession maps to <code>org.Hs.eg.db</code> so that mouse host-derived proteins are excluded before MSstats sees the data.</p>
+<div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(raw_spectronaut, <span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_report.qs2"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>prim_acc  <span class="ot">&lt;-</span> <span class="fu">str_extract</span>(raw_spectronaut<span class="sc">$</span>PG.ProteinGroups, <span class="st">"^[^;]+"</span>)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>human_map <span class="ot">&lt;-</span> <span class="fu">mapIds</span>(org.Hs.eg.db, <span class="fu">unique</span>(prim_acc),</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"SYMBOL"</span>, <span class="st">"UNIPROT"</span>, <span class="at">multiVals =</span> <span class="st">"first"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stderr">
+<pre><code>'select()' returned 1:many mapping between keys and columns</code></pre>
+</div>
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>human_acc <span class="ot">&lt;-</span> <span class="fu">names</span>(human_map)[<span class="sc">!</span><span class="fu">is.na</span>(human_map)]</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>n_pg_before <span class="ot">&lt;-</span> <span class="fu">uniqueN</span>(raw_spectronaut<span class="sc">$</span>PG.ProteinGroups)</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>raw_spectronaut <span class="ot">&lt;-</span> raw_spectronaut[prim_acc <span class="sc">%in%</span> human_acc]</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>n_pg_after  <span class="ot">&lt;-</span> <span class="fu">uniqueN</span>(raw_spectronaut<span class="sc">$</span>PG.ProteinGroups)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Protein groups before human filter:"</span>, n_pg_before, <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Protein groups before human filter: 13017 </code></pre>
+</div>
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Protein groups after  human filter:"</span>, n_pg_after,  <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Protein groups after  human filter: 6514 </code></pre>
+</div>
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Mouse protein groups removed:      "</span>, n_pg_before <span class="sc">-</span> n_pg_after, <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Mouse protein groups removed:       6503 </code></pre>
+</div>
+<details class="code-fold">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(raw_spectronaut, <span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_report.qs2"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 </section>
@@ -312,7 +357,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>raw_spectronaut <span class="ot">&lt;-</span> <span class="fu">qs_read</span>(<span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_report.qs2"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>raw_spectronaut <span class="ot">&lt;-</span> <span class="fu">qs_read</span>(<span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_report.qs2"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 </section>
@@ -321,31 +366,31 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>raw_spectronaut[msstats_annotation,</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>                on <span class="ot">=</span> <span class="fu">c</span>(<span class="st">"R.FileName"</span> <span class="ot">=</span> <span class="st">"Run"</span>),</span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>                <span class="st">`</span><span class="at">:=</span><span class="st">`</span>(<span class="at">R.Condition =</span> i.Condition,</span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>                     <span class="at">R.Replicate =</span> i.BioReplicate)]</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Condition distribution after fix:</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>raw_spectronaut[msstats_annotation,</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>                on <span class="ot">=</span> <span class="fu">c</span>(<span class="st">"R.FileName"</span> <span class="ot">=</span> <span class="st">"Run"</span>),</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>                <span class="st">`</span><span class="at">:=</span><span class="st">`</span>(<span class="at">R.Condition =</span> i.Condition,</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>                     <span class="at">R.Replicate =</span> i.BioReplicate)]</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Condition distribution after fix:</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>Condition distribution after fix:</code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(raw_spectronaut[, .N, <span class="at">by =</span> .(R.Condition, R.FileName)][<span class="fu">order</span>(R.Condition, R.FileName)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(raw_spectronaut[, .N, <span class="at">by =</span> .(R.Condition, R.FileName)][<span class="fu">order</span>(R.Condition, R.FileName)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>   R.Condition         R.FileName      N
         &lt;char&gt;             &lt;char&gt;  &lt;int&gt;
-1:          KO ds51_S5-A10_1_6422 769513
-2:          KO  ds51_S5-A9_1_6421 769513
-3:          KO ds61_S5-A11_1_6423 769513
-4:          KO ds62_S5-A12_1_6424 769513
-5:          WT  ds11_S5-A2_1_6412 769513
-6:          WT  ds12_S5-A1_1_6411 769513
-7:          WT  ds21_S5-A4_1_6414 769513
-8:          WT  ds22_S5-A3_1_6413 769513</code></pre>
+1:          KO ds51_S5-A10_1_6422 354728
+2:          KO  ds51_S5-A9_1_6421 354728
+3:          KO ds61_S5-A11_1_6423 354728
+4:          KO ds62_S5-A12_1_6424 354728
+5:          WT  ds11_S5-A2_1_6412 354728
+6:          WT  ds12_S5-A1_1_6411 354728
+7:          WT  ds21_S5-A4_1_6414 354728
+8:          WT  ds22_S5-A3_1_6413 354728</code></pre>
 </div>
 </div>
 </section>
@@ -355,55 +400,55 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>msstats_input <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">SpectronauttoMSstatsFormat</span>(</span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  raw_spectronaut,</span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">annotation                 =</span> msstats_annotation,</span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">filter_with_Qvalue         =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">qvalue_cutoff              =</span> <span class="fl">0.01</span>,</span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">fewMeasurements            =</span> <span class="st">"remove"</span>,</span>
-<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">removeProtein_with1Feature =</span> <span class="cn">FALSE</span></span>
-<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>msstats_input <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">SpectronauttoMSstatsFormat</span>(</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  raw_spectronaut,</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">annotation                 =</span> msstats_annotation,</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">filter_with_Qvalue         =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">qvalue_cutoff              =</span> <span class="fl">0.01</span>,</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">fewMeasurements            =</span> <span class="st">"remove"</span>,</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">removeProtein_with1Feature =</span> <span class="cn">FALSE</span></span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>INFO  [2026-05-06 10:27:48] ** Raw data from Spectronaut imported successfully.
-INFO  [2026-05-06 10:27:50] ** Raw data from Spectronaut cleaned successfully.
-INFO  [2026-05-06 10:27:50] ** Using provided annotation.
-INFO  [2026-05-06 10:27:50] ** Run labels were standardized to remove symbols such as '.' or '%'.
-INFO  [2026-05-06 10:27:50] ** The following options are used:
+<pre><code>INFO  [2026-05-11 15:47:35] ** Raw data from Spectronaut imported successfully.
+INFO  [2026-05-11 15:47:35] ** Raw data from Spectronaut cleaned successfully.
+INFO  [2026-05-11 15:47:35] ** Using provided annotation.
+INFO  [2026-05-11 15:47:35] ** Run labels were standardized to remove symbols such as '.' or '%'.
+INFO  [2026-05-11 15:47:35] ** The following options are used:
   - Features will be defined by the columns: PeptideSequence, PrecursorCharge, FragmentIon, ProductCharge
   - Shared peptides will be removed.
   - Proteins with single feature will not be removed.
   - Features with less than 3 measurements across runs will be removed.
-INFO  [2026-05-06 10:27:51] ** Intensities with values of FExcludedFromQuantification equal to TRUE are replaced with NA
-WARN  [2026-05-06 10:27:52] ** PGQvalue not found in input columns.
-INFO  [2026-05-06 10:27:52] ** Intensities with values not smaller than 0.01 in EGQvalue are replaced with NA
-INFO  [2026-05-06 10:27:54] ** Features with all missing measurements across runs are removed.
-INFO  [2026-05-06 10:27:55] ** Shared peptides are removed.
-INFO  [2026-05-06 10:28:18] ** Multiple measurements in a feature and a run are summarized by summaryforMultipleRows: max
-INFO  [2026-05-06 10:28:19] ** Features with one or two measurements across runs are removed.
-INFO  [2026-05-06 10:28:20] ** Run annotation merged with quantification data.
-INFO  [2026-05-06 10:28:22] ** Features with one or two measurements across runs are removed.
-INFO  [2026-05-06 10:28:22] ** Fractionation handled.
-INFO  [2026-05-06 10:28:27] ** Updated quantification data to make balanced design. Missing values are marked by NA
-INFO  [2026-05-06 10:28:28] ** Finished preprocessing. The dataset is ready to be processed by the dataProcess function.</code></pre>
+INFO  [2026-05-11 15:47:36] ** Intensities with values of FExcludedFromQuantification equal to TRUE are replaced with NA
+WARN  [2026-05-11 15:47:36] ** PGQvalue not found in input columns.
+INFO  [2026-05-11 15:47:36] ** Intensities with values not smaller than 0.01 in EGQvalue are replaced with NA
+INFO  [2026-05-11 15:47:37] ** Features with all missing measurements across runs are removed.
+INFO  [2026-05-11 15:47:37] ** Shared peptides are removed.
+INFO  [2026-05-11 15:47:49] ** Multiple measurements in a feature and a run are summarized by summaryforMultipleRows: max
+INFO  [2026-05-11 15:47:49] ** Features with one or two measurements across runs are removed.
+INFO  [2026-05-11 15:47:50] ** Run annotation merged with quantification data.
+INFO  [2026-05-11 15:47:51] ** Features with one or two measurements across runs are removed.
+INFO  [2026-05-11 15:47:51] ** Fractionation handled.
+INFO  [2026-05-11 15:47:53] ** Updated quantification data to make balanced design. Missing values are marked by NA
+INFO  [2026-05-11 15:47:53] ** Finished preprocessing. The dataset is ready to be processed by the dataProcess function.</code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"MSstats input rows:"</span>, <span class="fu">nrow</span>(msstats_input), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"MSstats input rows:"</span>, <span class="fu">nrow</span>(msstats_input), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>MSstats input rows: 2764824 </code></pre>
+<pre><code>MSstats input rows: 1232440 </code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Unique proteins:   "</span>, <span class="fu">uniqueN</span>(msstats_input<span class="sc">$</span>ProteinName), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Unique proteins:   "</span>, <span class="fu">uniqueN</span>(msstats_input<span class="sc">$</span>ProteinName), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Unique proteins:    12515 </code></pre>
+<pre><code>Unique proteins:    6182 </code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(msstats_input, <span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_input.qs2"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(msstats_input, <span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_input.qs2"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 </section>
@@ -413,50 +458,50 @@ INFO  [2026-05-06 10:28:28] ** Finished preprocessing. The dataset is ready to b
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Manual resume — skip rebuild on re-run</span></span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>msstats_input <span class="ot">&lt;-</span> <span class="fu">qs_read</span>(<span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_input.qs2"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Manual resume — skip rebuild on re-run</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>msstats_input <span class="ot">&lt;-</span> <span class="fu">qs_read</span>(<span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_input.qs2"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>msstats_input_filt <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(msstats_input) <span class="sc">%&gt;%</span></span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ProteinName, PeptideSequence, PrecursorCharge,</span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>           FragmentIon, ProductCharge, Condition) <span class="sc">%&gt;%</span></span>
-<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
-<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_obs   =</span> <span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(Intensity) <span class="sc">&amp;</span> Intensity <span class="sc">&gt;</span> <span class="dv">0</span>),</span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_total =</span> <span class="fu">n</span>(),</span>
-<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">prop    =</span> n_obs <span class="sc">/</span> n_total,</span>
-<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
-<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ProteinName, PeptideSequence, PrecursorCharge,</span>
-<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>           FragmentIon, ProductCharge) <span class="sc">%&gt;%</span></span>
-<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">any</span>(prop <span class="sc">&gt;=</span> <span class="fl">0.5</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(</span>
-<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as.data.frame</span>(msstats_input),</span>
-<span id="cb24-16"><a href="#cb24-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"ProteinName"</span>, <span class="st">"PeptideSequence"</span>, <span class="st">"PrecursorCharge"</span>,</span>
-<span id="cb24-17"><a href="#cb24-17" aria-hidden="true" tabindex="-1"></a>           <span class="st">"FragmentIon"</span>, <span class="st">"ProductCharge"</span>, <span class="st">"Condition"</span>)</span>
-<span id="cb24-18"><a href="#cb24-18" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb24-19"><a href="#cb24-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-20"><a href="#cb24-20" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"Rows before completeness filter: "</span>, <span class="fu">nrow</span>(msstats_input))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>msstats_input_filt <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(msstats_input) <span class="sc">%&gt;%</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ProteinName, PeptideSequence, PrecursorCharge,</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>           FragmentIon, ProductCharge, Condition) <span class="sc">%&gt;%</span></span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_obs   =</span> <span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(Intensity) <span class="sc">&amp;</span> Intensity <span class="sc">&gt;</span> <span class="dv">0</span>),</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_total =</span> <span class="fu">n</span>(),</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">prop    =</span> n_obs <span class="sc">/</span> n_total,</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ProteinName, PeptideSequence, PrecursorCharge,</span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>           FragmentIon, ProductCharge) <span class="sc">%&gt;%</span></span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">any</span>(prop <span class="sc">&gt;=</span> <span class="fl">0.5</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb32-14"><a href="#cb32-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(</span>
+<span id="cb32-15"><a href="#cb32-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as.data.frame</span>(msstats_input),</span>
+<span id="cb32-16"><a href="#cb32-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"ProteinName"</span>, <span class="st">"PeptideSequence"</span>, <span class="st">"PrecursorCharge"</span>,</span>
+<span id="cb32-17"><a href="#cb32-17" aria-hidden="true" tabindex="-1"></a>           <span class="st">"FragmentIon"</span>, <span class="st">"ProductCharge"</span>, <span class="st">"Condition"</span>)</span>
+<span id="cb32-18"><a href="#cb32-18" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb32-19"><a href="#cb32-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-20"><a href="#cb32-20" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"Rows before completeness filter: "</span>, <span class="fu">nrow</span>(msstats_input))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stderr">
-<pre><code>Rows before completeness filter: 2764824</code></pre>
+<pre><code>Rows before completeness filter: 1232440</code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"Rows after  completeness filter: "</span>, <span class="fu">nrow</span>(msstats_input_filt))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"Rows after  completeness filter: "</span>, <span class="fu">nrow</span>(msstats_input_filt))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stderr">
-<pre><code>Rows after  completeness filter: 2764824</code></pre>
+<pre><code>Rows after  completeness filter: 1232440</code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"Proteins retained: "</span>, <span class="fu">uniqueN</span>(msstats_input_filt<span class="sc">$</span>ProteinName))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"Proteins retained: "</span>, <span class="fu">uniqueN</span>(msstats_input_filt<span class="sc">$</span>ProteinName))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stderr">
-<pre><code>Proteins retained: 12515</code></pre>
+<pre><code>Proteins retained: 6182</code></pre>
 </div>
 </div>
 </section>
@@ -466,46 +511,46 @@ INFO  [2026-05-06 10:28:28] ** Finished preprocessing. The dataset is ready to b
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>processed_data <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">dataProcess</span>(</span>
-<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  msstats_input_filt,</span>
-<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">normalization                        =</span> <span class="st">"equalizeMedians"</span>,</span>
-<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">summaryMethod                        =</span> <span class="st">"TMP"</span>,</span>
-<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">censoredInt                          =</span> <span class="st">"NA"</span>,</span>
-<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">MBimpute                             =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">featureSubset                        =</span> <span class="st">"highQuality"</span>,</span>
-<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">remove_uninformative_feature_outlier =</span> <span class="cn">TRUE</span></span>
-<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>processed_data <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">dataProcess</span>(</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>  msstats_input_filt,</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">normalization                        =</span> <span class="st">"equalizeMedians"</span>,</span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">summaryMethod                        =</span> <span class="st">"TMP"</span>,</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">censoredInt                          =</span> <span class="st">"NA"</span>,</span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">MBimpute                             =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">featureSubset                        =</span> <span class="st">"highQuality"</span>,</span>
+<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">remove_uninformative_feature_outlier =</span> <span class="cn">TRUE</span></span>
+<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>INFO  [2026-05-06 10:28:52] ** Features with one or two measurements across runs are removed.
-INFO  [2026-05-06 10:28:52] ** Fractionation handled.
-INFO  [2026-05-06 10:28:57] ** Updated quantification data to make balanced design. Missing values are marked by NA
-INFO  [2026-05-06 10:29:04] ** Log2 intensities under cutoff = -3.0224  were considered as censored missing values.
-INFO  [2026-05-06 10:29:04] ** Log2 intensities = NA were considered as censored missing values.
-INFO  [2026-05-06 10:34:34] ** Flag uninformative feature and outliers by feature selection algorithm.
-INFO  [2026-05-06 10:34:35] 
- # proteins: 12515
- # peptides per protein: 1-310
+<pre><code>INFO  [2026-05-11 15:48:05] ** Features with one or two measurements across runs are removed.
+INFO  [2026-05-11 15:48:05] ** Fractionation handled.
+INFO  [2026-05-11 15:48:07] ** Updated quantification data to make balanced design. Missing values are marked by NA
+INFO  [2026-05-11 15:48:11] ** Log2 intensities under cutoff = -3.1598  were considered as censored missing values.
+INFO  [2026-05-11 15:48:11] ** Log2 intensities = NA were considered as censored missing values.
+INFO  [2026-05-11 15:50:12] ** Flag uninformative feature and outliers by feature selection algorithm.
+INFO  [2026-05-11 15:50:12] 
+ # proteins: 6182
+ # peptides per protein: 1-268
  # features per peptide: 1-6
-INFO  [2026-05-06 10:34:35] Some proteins have only one feature: 
+INFO  [2026-05-11 15:50:12] Some proteins have only one feature: 
  A0A1W2PQ72,
  O43548,
  O75438,
  O75569,
- P04919 ...
-INFO  [2026-05-06 10:34:35] 
+ P17535 ...
+INFO  [2026-05-11 15:50:12] 
                     KO WT
              # runs  4  4
     # bioreplicates  4  4
  # tech. replicates  1  1
-INFO  [2026-05-06 10:34:36] Some features are completely missing in at least one condition:  
- AADLLLHSK_2_y3_1,
- AADLLLHSK_2_y4_1,
- AADLLLHSK_2_y5_1,
- AAEEGKDYPFAR_3_y3_1,
- AAEEGKDYPFAR_3_y4_1 ...
-INFO  [2026-05-06 10:34:36]  == Start the summarization per subplot...
-INFO  [2026-05-06 10:34:36] ** Filtered out uninformative features and outliers.
+INFO  [2026-05-11 15:50:13] Some features are completely missing in at least one condition:  
+ AAKPKDPVEVAQPSEVLR_3_b10_2,
+ AAKPKDPVEVAQPSEVLR_3_y6_1,
+ AALMDASQLEPGEK_2_y10_1,
+ AALMDASQLEPGEK_2_y4_1,
+ AALMDASQLEPGEK_2_y9_1 ...
+INFO  [2026-05-11 15:50:13]  == Start the summarization per subplot...
+INFO  [2026-05-11 15:50:13] ** Filtered out uninformative features and outliers.
 
   |                                                                            
   |                                                                      |   0%
@@ -660,7 +705,13 @@ INFO  [2026-05-06 10:34:36] ** Filtered out uninformative features and outliers.
   |                                                                            
   |===============================                                       |  44%
   |                                                                            
-  |===============================                                       |  45%
+  |===============================                                       |  45%</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Convergence warning caught: Ran out of iterations and did not converge</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
   |                                                                            
   |================================                                      |  45%
   |                                                                            
@@ -849,11 +900,11 @@ INFO  [2026-05-06 10:34:36] ** Filtered out uninformative features and outliers.
   |======================================================================|  99%
   |                                                                            
   |======================================================================| 100%
-INFO  [2026-05-06 10:38:33]  == Summarization is done.</code></pre>
+INFO  [2026-05-11 15:51:57]  == Summarization is done.</code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(processed_data, <span class="fu">file.path</span>(objects_dir, <span class="st">"processed_msstats_data.qs2"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(processed_data, <span class="fu">file.path</span>(objects_dir, <span class="st">"processed_msstats_data.qs2"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 </section>
@@ -862,7 +913,7 @@ INFO  [2026-05-06 10:38:33]  == Summarization is done.</code></pre>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>processed_data <span class="ot">&lt;-</span> <span class="fu">qs_read</span>(<span class="fu">file.path</span>(objects_dir, <span class="st">"processed_msstats_data.qs2"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>processed_data <span class="ot">&lt;-</span> <span class="fu">qs_read</span>(<span class="fu">file.path</span>(objects_dir, <span class="st">"processed_msstats_data.qs2"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 </section>
@@ -872,15 +923,15 @@ INFO  [2026-05-06 10:38:33]  == Summarization is done.</code></pre>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>condition_levels <span class="ot">&lt;-</span> <span class="fu">levels</span>(processed_data<span class="sc">$</span>ProteinLevelData<span class="sc">$</span>GROUP)</span>
-<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Condition levels (alphabetical):</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>condition_levels <span class="ot">&lt;-</span> <span class="fu">levels</span>(processed_data<span class="sc">$</span>ProteinLevelData<span class="sc">$</span>GROUP)</span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Condition levels (alphabetical):</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>Condition levels (alphabetical):</code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(condition_levels)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(condition_levels)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] "KO" "WT"</code></pre>
@@ -893,19 +944,19 @@ INFO  [2026-05-06 10:38:33]  == Summarization is done.</code></pre>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>make_contrast <span class="ot">&lt;-</span> <span class="cf">function</span>(numerator, denominator, levels) {</span>
-<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>  v <span class="ot">&lt;-</span> <span class="fu">setNames</span>(<span class="fu">rep</span>(<span class="dv">0</span>L, <span class="fu">length</span>(levels)), levels)</span>
-<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>  v[numerator]   <span class="ot">&lt;-</span>  <span class="dv">1</span>L</span>
-<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>  v[denominator] <span class="ot">&lt;-</span> <span class="sc">-</span><span class="dv">1</span>L</span>
-<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>  v</span>
-<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a>comparison_matrix <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
-<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">make_contrast</span>(<span class="st">"KO"</span>, <span class="st">"WT"</span>, condition_levels)</span>
-<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(comparison_matrix) <span class="ot">&lt;-</span> <span class="st">"KO_vs_WT"</span></span>
-<span id="cb38-12"><a href="#cb38-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb38-13"><a href="#cb38-13" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(comparison_matrix)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>make_contrast <span class="ot">&lt;-</span> <span class="cf">function</span>(numerator, denominator, levels) {</span>
+<span id="cb48-2"><a href="#cb48-2" aria-hidden="true" tabindex="-1"></a>  v <span class="ot">&lt;-</span> <span class="fu">setNames</span>(<span class="fu">rep</span>(<span class="dv">0</span>L, <span class="fu">length</span>(levels)), levels)</span>
+<span id="cb48-3"><a href="#cb48-3" aria-hidden="true" tabindex="-1"></a>  v[numerator]   <span class="ot">&lt;-</span>  <span class="dv">1</span>L</span>
+<span id="cb48-4"><a href="#cb48-4" aria-hidden="true" tabindex="-1"></a>  v[denominator] <span class="ot">&lt;-</span> <span class="sc">-</span><span class="dv">1</span>L</span>
+<span id="cb48-5"><a href="#cb48-5" aria-hidden="true" tabindex="-1"></a>  v</span>
+<span id="cb48-6"><a href="#cb48-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb48-7"><a href="#cb48-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb48-8"><a href="#cb48-8" aria-hidden="true" tabindex="-1"></a>comparison_matrix <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb48-9"><a href="#cb48-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">make_contrast</span>(<span class="st">"KO"</span>, <span class="st">"WT"</span>, condition_levels)</span>
+<span id="cb48-10"><a href="#cb48-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb48-11"><a href="#cb48-11" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(comparison_matrix) <span class="ot">&lt;-</span> <span class="st">"KO_vs_WT"</span></span>
+<span id="cb48-12"><a href="#cb48-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb48-13"><a href="#cb48-13" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(comparison_matrix)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code>         KO WT
@@ -919,12 +970,12 @@ KO_vs_WT  1 -1</code></pre>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>test_results <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(</span>
-<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">groupComparison</span>(<span class="at">contrast.matrix =</span> comparison_matrix, <span class="at">data =</span> processed_data)</span>
-<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>test_results <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(</span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">groupComparison</span>(<span class="at">contrast.matrix =</span> comparison_matrix, <span class="at">data =</span> processed_data)</span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>INFO  [2026-05-06 10:38:43]  == Start to test and get inference in whole plot ...
+<pre><code>INFO  [2026-05-11 15:52:03]  == Start to test and get inference in whole plot ...
 
   |                                                                            
   |                                                                      |   0%
@@ -1268,29 +1319,29 @@ KO_vs_WT  1 -1</code></pre>
   |======================================================================|  99%
   |                                                                            
   |======================================================================| 100%
-INFO  [2026-05-06 10:41:17]  == Comparisons for all proteins are done.</code></pre>
+INFO  [2026-05-11 15:53:13]  == Comparisons for all proteins are done.</code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(test_results, <span class="fu">file.path</span>(objects_dir, <span class="st">"comparison_results.qs2"</span>))</span>
-<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>res_df <span class="ot">&lt;-</span> <span class="fu">as.data.table</span>(test_results<span class="sc">$</span>ComparisonResult)</span>
-<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Total protein-comparison rows:"</span>, <span class="fu">nrow</span>(res_df), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb52"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(test_results, <span class="fu">file.path</span>(objects_dir, <span class="st">"comparison_results.qs2"</span>))</span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb52-3"><a href="#cb52-3" aria-hidden="true" tabindex="-1"></a>res_df <span class="ot">&lt;-</span> <span class="fu">as.data.table</span>(test_results<span class="sc">$</span>ComparisonResult)</span>
+<span id="cb52-4"><a href="#cb52-4" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Total protein-comparison rows:"</span>, <span class="fu">nrow</span>(res_df), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Total protein-comparison rows: 12500 </code></pre>
+<pre><code>Total protein-comparison rows: 6167 </code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Significant (adj.pvalue &lt; 0.05):"</span>,</span>
-<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">nrow</span>(res_df[adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span>, ]), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb54"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Significant (adj.pvalue &lt; 0.05):"</span>,</span>
+<span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">nrow</span>(res_df[adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span>, ]), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
-<pre><code>Significant (adj.pvalue &lt; 0.05): 30 </code></pre>
+<pre><code>Significant (adj.pvalue &lt; 0.05): 14 </code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="fu">fwrite</span>(res_df, <span class="fu">file.path</span>(results_dir, <span class="st">"Full_GroupComparison_Results.csv"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb56"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="fu">fwrite</span>(res_df, <span class="fu">file.path</span>(results_dir, <span class="st">"Full_GroupComparison_Results.csv"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 </section>
@@ -1299,22 +1350,22 @@ INFO  [2026-05-06 10:41:17]  == Comparisons for all proteins are done.</code></p
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>res_df <span class="sc">%&gt;%</span></span>
-<span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(adj.pvalue)) <span class="sc">%&gt;%</span></span>
-<span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Label) <span class="sc">%&gt;%</span></span>
-<span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
-<span id="cb47-5"><a href="#cb47-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_tested =</span> <span class="fu">n</span>(),</span>
-<span id="cb47-6"><a href="#cb47-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_sig    =</span> <span class="fu">sum</span>(adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
-<span id="cb47-7"><a href="#cb47-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_up     =</span> <span class="fu">sum</span>(adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span> <span class="sc">&amp;</span> log2FC <span class="sc">&gt;</span> <span class="dv">0</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
-<span id="cb47-8"><a href="#cb47-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_down   =</span> <span class="fu">sum</span>(adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span> <span class="sc">&amp;</span> log2FC <span class="sc">&lt;</span> <span class="dv">0</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
-<span id="cb47-9"><a href="#cb47-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups  =</span> <span class="st">"drop"</span></span>
-<span id="cb47-10"><a href="#cb47-10" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb57"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a>res_df <span class="sc">%&gt;%</span></span>
+<span id="cb57-2"><a href="#cb57-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(adj.pvalue)) <span class="sc">%&gt;%</span></span>
+<span id="cb57-3"><a href="#cb57-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Label) <span class="sc">%&gt;%</span></span>
+<span id="cb57-4"><a href="#cb57-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb57-5"><a href="#cb57-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_tested =</span> <span class="fu">n</span>(),</span>
+<span id="cb57-6"><a href="#cb57-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_sig    =</span> <span class="fu">sum</span>(adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb57-7"><a href="#cb57-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_up     =</span> <span class="fu">sum</span>(adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span> <span class="sc">&amp;</span> log2FC <span class="sc">&gt;</span> <span class="dv">0</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb57-8"><a href="#cb57-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_down   =</span> <span class="fu">sum</span>(adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span> <span class="sc">&amp;</span> log2FC <span class="sc">&lt;</span> <span class="dv">0</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb57-9"><a href="#cb57-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups  =</span> <span class="st">"drop"</span></span>
+<span id="cb57-10"><a href="#cb57-10" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 1 × 5
   Label    n_tested n_sig  n_up n_down
   &lt;chr&gt;       &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;int&gt;
-1 KO_vs_WT    12500    30    12     18</code></pre>
+1 KO_vs_WT     6167    14     7      7</code></pre>
 </div>
 </div>
 </section>
@@ -1323,8 +1374,8 @@ INFO  [2026-05-06 10:41:17]  == Comparisons for all proteins are done.</code></p
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>test_results <span class="ot">&lt;-</span> <span class="fu">qs_read</span>(<span class="fu">file.path</span>(objects_dir, <span class="st">"comparison_results.qs2"</span>))</span>
-<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a>res_df       <span class="ot">&lt;-</span> <span class="fu">as.data.table</span>(test_results<span class="sc">$</span>ComparisonResult)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb59"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>test_results <span class="ot">&lt;-</span> <span class="fu">qs_read</span>(<span class="fu">file.path</span>(objects_dir, <span class="st">"comparison_results.qs2"</span>))</span>
+<span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a>res_df       <span class="ot">&lt;-</span> <span class="fu">as.data.table</span>(test_results<span class="sc">$</span>ComparisonResult)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 
@@ -1805,258 +1856,281 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   }
 });
 </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
-<div class="sourceCode" id="cb50" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "2. MSstats — Differential Abundance Analysis"</span></span>
-<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-5"><a href="#cb50-5" aria-hidden="true" tabindex="-1"></a><span class="fu">## Libraries</span></span>
-<span id="cb50-6"><a href="#cb50-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-7"><a href="#cb50-7" aria-hidden="true" tabindex="-1"></a><span class="in">```{r setup, include=TRUE, message=FALSE}</span></span>
-<span id="cb50-8"><a href="#cb50-8" aria-hidden="true" tabindex="-1"></a><span class="in">library(data.table)</span></span>
-<span id="cb50-9"><a href="#cb50-9" aria-hidden="true" tabindex="-1"></a><span class="in">library(MSstats)</span></span>
-<span id="cb50-10"><a href="#cb50-10" aria-hidden="true" tabindex="-1"></a><span class="in">library(qs2)</span></span>
-<span id="cb50-11"><a href="#cb50-11" aria-hidden="true" tabindex="-1"></a><span class="in">library(dplyr)</span></span>
-<span id="cb50-12"><a href="#cb50-12" aria-hidden="true" tabindex="-1"></a><span class="in">library(ggplot2)</span></span>
-<span id="cb50-13"><a href="#cb50-13" aria-hidden="true" tabindex="-1"></a><span class="in">library(ggrepel)</span></span>
-<span id="cb50-14"><a href="#cb50-14" aria-hidden="true" tabindex="-1"></a><span class="in">library(tidyverse)</span></span>
-<span id="cb50-15"><a href="#cb50-15" aria-hidden="true" tabindex="-1"></a><span class="in">library(readr)</span></span>
-<span id="cb50-16"><a href="#cb50-16" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-17"><a href="#cb50-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-18"><a href="#cb50-18" aria-hidden="true" tabindex="-1"></a><span class="fu">## Set directories</span></span>
-<span id="cb50-19"><a href="#cb50-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-22"><a href="#cb50-22" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb50-23"><a href="#cb50-23" aria-hidden="true" tabindex="-1"></a>base_dir    <span class="ot">&lt;-</span> <span class="st">"/nemo/lab/destrooperb/home/shared/zanettc/dom_proteomics"</span></span>
-<span id="cb50-24"><a href="#cb50-24" aria-hidden="true" tabindex="-1"></a>run_num     <span class="ot">&lt;-</span> <span class="st">"run1"</span></span>
-<span id="cb50-25"><a href="#cb50-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-26"><a href="#cb50-26" aria-hidden="true" tabindex="-1"></a>results_dir <span class="ot">&lt;-</span> <span class="fu">file.path</span>(base_dir, <span class="st">"results"</span>, run_num)</span>
-<span id="cb50-27"><a href="#cb50-27" aria-hidden="true" tabindex="-1"></a>objects_dir <span class="ot">&lt;-</span> <span class="fu">file.path</span>(base_dir, <span class="st">"data"</span>, <span class="st">"processed"</span>, run_num)</span>
-<span id="cb50-28"><a href="#cb50-28" aria-hidden="true" tabindex="-1"></a>input_dir   <span class="ot">&lt;-</span> <span class="fu">file.path</span>(base_dir, <span class="st">"data"</span>, <span class="st">"inputs"</span>,</span>
-<span id="cb50-29"><a href="#cb50-29" aria-hidden="true" tabindex="-1"></a>                         <span class="st">"2026_04_23_SORL1_mg_total_proteomics"</span>)</span>
-<span id="cb50-30"><a href="#cb50-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-31"><a href="#cb50-31" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(results_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb50-32"><a href="#cb50-32" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(objects_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb50-33"><a href="#cb50-33" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-34"><a href="#cb50-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-35"><a href="#cb50-35" aria-hidden="true" tabindex="-1"></a><span class="fu">## Build annotation from study design</span></span>
-<span id="cb50-36"><a href="#cb50-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-37"><a href="#cb50-37" aria-hidden="true" tabindex="-1"></a>All 8 samples passed QC. R.Condition in the raw file is "Not Defined" — we assign</span>
-<span id="cb50-38"><a href="#cb50-38" aria-hidden="true" tabindex="-1"></a>WT/KO here from the known sample table.</span>
-<span id="cb50-39"><a href="#cb50-39" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-40"><a href="#cb50-40" aria-hidden="true" tabindex="-1"></a>Note: WT samples are all Male (BDAG171 cohort); KO samples are 2 Female + 2 Male</span>
-<span id="cb50-41"><a href="#cb50-41" aria-hidden="true" tabindex="-1"></a>(BDAG173 cohort). Sex is not modelled as a covariate in the MSstats linear model —</span>
-<span id="cb50-42"><a href="#cb50-42" aria-hidden="true" tabindex="-1"></a>the KO vs WT contrast is therefore partially confounded with sex.</span>
-<span id="cb50-43"><a href="#cb50-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-46"><a href="#cb50-46" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb50-47"><a href="#cb50-47" aria-hidden="true" tabindex="-1"></a>msstats_annotation <span class="ot">&lt;-</span> <span class="fu">data.table</span>(</span>
-<span id="cb50-48"><a href="#cb50-48" aria-hidden="true" tabindex="-1"></a>  <span class="at">Run =</span> <span class="fu">c</span>(</span>
-<span id="cb50-49"><a href="#cb50-49" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ds12_S5-A1_1_6411"</span>, <span class="st">"ds11_S5-A2_1_6412"</span>,</span>
-<span id="cb50-50"><a href="#cb50-50" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ds22_S5-A3_1_6413"</span>, <span class="st">"ds21_S5-A4_1_6414"</span>,</span>
-<span id="cb50-51"><a href="#cb50-51" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ds51_S5-A9_1_6421"</span>, <span class="st">"ds51_S5-A10_1_6422"</span>,</span>
-<span id="cb50-52"><a href="#cb50-52" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ds61_S5-A11_1_6423"</span>, <span class="st">"ds62_S5-A12_1_6424"</span></span>
-<span id="cb50-53"><a href="#cb50-53" aria-hidden="true" tabindex="-1"></a>  ),</span>
-<span id="cb50-54"><a href="#cb50-54" aria-hidden="true" tabindex="-1"></a>  <span class="at">Condition    =</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="st">"WT"</span>, <span class="dv">4</span>), <span class="fu">rep</span>(<span class="st">"KO"</span>, <span class="dv">4</span>)),</span>
-<span id="cb50-55"><a href="#cb50-55" aria-hidden="true" tabindex="-1"></a>  <span class="at">BioReplicate =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span></span>
-<span id="cb50-56"><a href="#cb50-56" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb50-57"><a href="#cb50-57" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-58"><a href="#cb50-58" aria-hidden="true" tabindex="-1"></a>msstats_annotation</span>
-<span id="cb50-59"><a href="#cb50-59" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-60"><a href="#cb50-60" aria-hidden="true" tabindex="-1"></a><span class="fu">fwrite</span>(msstats_annotation, <span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_annotation.csv"</span>))</span>
-<span id="cb50-61"><a href="#cb50-61" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-62"><a href="#cb50-62" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-63"><a href="#cb50-63" aria-hidden="true" tabindex="-1"></a><span class="fu">## Load raw Spectronaut report</span></span>
-<span id="cb50-64"><a href="#cb50-64" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-65"><a href="#cb50-65" aria-hidden="true" tabindex="-1"></a>Select only the fragment-level columns required by MSstats to keep memory manageable.</span>
-<span id="cb50-66"><a href="#cb50-66" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-69"><a href="#cb50-69" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb50-70"><a href="#cb50-70" aria-hidden="true" tabindex="-1"></a>msstats_cols <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
-<span id="cb50-71"><a href="#cb50-71" aria-hidden="true" tabindex="-1"></a>  <span class="st">"R.Condition"</span>, <span class="st">"R.FileName"</span>, <span class="st">"R.Replicate"</span>,</span>
-<span id="cb50-72"><a href="#cb50-72" aria-hidden="true" tabindex="-1"></a>  <span class="st">"PG.ProteinGroups"</span>, <span class="st">"PG.ProteinAccessions"</span>,</span>
-<span id="cb50-73"><a href="#cb50-73" aria-hidden="true" tabindex="-1"></a>  <span class="st">"PEP.StrippedSequence"</span>,</span>
-<span id="cb50-74"><a href="#cb50-74" aria-hidden="true" tabindex="-1"></a>  <span class="st">"EG.ModifiedSequence"</span>, <span class="st">"EG.PrecursorId"</span>, <span class="st">"EG.Qvalue"</span>,</span>
-<span id="cb50-75"><a href="#cb50-75" aria-hidden="true" tabindex="-1"></a>  <span class="st">"FG.Charge"</span>, <span class="st">"FG.Id"</span>,</span>
-<span id="cb50-76"><a href="#cb50-76" aria-hidden="true" tabindex="-1"></a>  <span class="st">"F.FrgIon"</span>, <span class="st">"F.Charge"</span>, <span class="st">"F.FrgLossType"</span>, <span class="st">"F.FrgNum"</span>, <span class="st">"F.FrgType"</span>,</span>
-<span id="cb50-77"><a href="#cb50-77" aria-hidden="true" tabindex="-1"></a>  <span class="st">"F.NormalizedPeakArea"</span>, <span class="st">"F.PeakArea"</span>, <span class="st">"F.ExcludedFromQuantification"</span></span>
-<span id="cb50-78"><a href="#cb50-78" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb50-79"><a href="#cb50-79" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-80"><a href="#cb50-80" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Reading Spectronaut report...</span><span class="sc">\n</span><span class="st">"</span>)</span>
-<span id="cb50-81"><a href="#cb50-81" aria-hidden="true" tabindex="-1"></a>raw_spectronaut <span class="ot">&lt;-</span> <span class="fu">fread</span>(</span>
-<span id="cb50-82"><a href="#cb50-82" aria-hidden="true" tabindex="-1"></a>  <span class="fu">file.path</span>(input_dir, <span class="st">"20260423_094931_S5-A10_Report_human.tsv"</span>),</span>
-<span id="cb50-83"><a href="#cb50-83" aria-hidden="true" tabindex="-1"></a>  <span class="at">select =</span> msstats_cols</span>
-<span id="cb50-84"><a href="#cb50-84" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb50-85"><a href="#cb50-85" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Rows loaded:"</span>, <span class="fu">nrow</span>(raw_spectronaut), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
-<span id="cb50-86"><a href="#cb50-86" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-87"><a href="#cb50-87" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(raw_spectronaut, <span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_report.qs2"</span>))</span>
-<span id="cb50-88"><a href="#cb50-88" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-89"><a href="#cb50-89" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-90"><a href="#cb50-90" aria-hidden="true" tabindex="-1"></a><span class="fu">## Reload from .qs2 (skip read on re-runs)</span></span>
-<span id="cb50-91"><a href="#cb50-91" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-92"><a href="#cb50-92" aria-hidden="true" tabindex="-1"></a><span class="in">```{r eval=FALSE}</span></span>
-<span id="cb50-93"><a href="#cb50-93" aria-hidden="true" tabindex="-1"></a><span class="in">raw_spectronaut &lt;- qs_read(file.path(objects_dir, "msstats_report.qs2"))</span></span>
-<span id="cb50-94"><a href="#cb50-94" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-95"><a href="#cb50-95" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-96"><a href="#cb50-96" aria-hidden="true" tabindex="-1"></a><span class="fu">## Overwrite R.Condition and R.Replicate with study design values</span></span>
-<span id="cb50-97"><a href="#cb50-97" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-100"><a href="#cb50-100" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb50-101"><a href="#cb50-101" aria-hidden="true" tabindex="-1"></a>raw_spectronaut[msstats_annotation,</span>
-<span id="cb50-102"><a href="#cb50-102" aria-hidden="true" tabindex="-1"></a>                on <span class="ot">=</span> <span class="fu">c</span>(<span class="st">"R.FileName"</span> <span class="ot">=</span> <span class="st">"Run"</span>),</span>
-<span id="cb50-103"><a href="#cb50-103" aria-hidden="true" tabindex="-1"></a>                <span class="st">`</span><span class="at">:=</span><span class="st">`</span>(<span class="at">R.Condition =</span> i.Condition,</span>
-<span id="cb50-104"><a href="#cb50-104" aria-hidden="true" tabindex="-1"></a>                     <span class="at">R.Replicate =</span> i.BioReplicate)]</span>
-<span id="cb50-105"><a href="#cb50-105" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-106"><a href="#cb50-106" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Condition distribution after fix:</span><span class="sc">\n</span><span class="st">"</span>)</span>
-<span id="cb50-107"><a href="#cb50-107" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(raw_spectronaut[, .N, <span class="at">by =</span> .(R.Condition, R.FileName)][<span class="fu">order</span>(R.Condition, R.FileName)])</span>
-<span id="cb50-108"><a href="#cb50-108" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-109"><a href="#cb50-109" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-110"><a href="#cb50-110" aria-hidden="true" tabindex="-1"></a><span class="fu">## Convert to MSstats input format</span></span>
-<span id="cb50-111"><a href="#cb50-111" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-112"><a href="#cb50-112" aria-hidden="true" tabindex="-1"></a>Feature-level filtering: Qvalue &lt; 0.01, remove features with too few measurements.</span>
-<span id="cb50-113"><a href="#cb50-113" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-116"><a href="#cb50-116" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb50-117"><a href="#cb50-117" aria-hidden="true" tabindex="-1"></a>msstats_input <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">SpectronauttoMSstatsFormat</span>(</span>
-<span id="cb50-118"><a href="#cb50-118" aria-hidden="true" tabindex="-1"></a>  raw_spectronaut,</span>
-<span id="cb50-119"><a href="#cb50-119" aria-hidden="true" tabindex="-1"></a>  <span class="at">annotation                 =</span> msstats_annotation,</span>
-<span id="cb50-120"><a href="#cb50-120" aria-hidden="true" tabindex="-1"></a>  <span class="at">filter_with_Qvalue         =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb50-121"><a href="#cb50-121" aria-hidden="true" tabindex="-1"></a>  <span class="at">qvalue_cutoff              =</span> <span class="fl">0.01</span>,</span>
-<span id="cb50-122"><a href="#cb50-122" aria-hidden="true" tabindex="-1"></a>  <span class="at">fewMeasurements            =</span> <span class="st">"remove"</span>,</span>
-<span id="cb50-123"><a href="#cb50-123" aria-hidden="true" tabindex="-1"></a>  <span class="at">removeProtein_with1Feature =</span> <span class="cn">FALSE</span></span>
-<span id="cb50-124"><a href="#cb50-124" aria-hidden="true" tabindex="-1"></a>))</span>
-<span id="cb50-125"><a href="#cb50-125" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-126"><a href="#cb50-126" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"MSstats input rows:"</span>, <span class="fu">nrow</span>(msstats_input), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
-<span id="cb50-127"><a href="#cb50-127" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Unique proteins:   "</span>, <span class="fu">uniqueN</span>(msstats_input<span class="sc">$</span>ProteinName), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
-<span id="cb50-128"><a href="#cb50-128" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-129"><a href="#cb50-129" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(msstats_input, <span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_input.qs2"</span>))</span>
-<span id="cb50-130"><a href="#cb50-130" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-131"><a href="#cb50-131" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-132"><a href="#cb50-132" aria-hidden="true" tabindex="-1"></a><span class="fu">## Feature completeness filter</span></span>
-<span id="cb50-133"><a href="#cb50-133" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-134"><a href="#cb50-134" aria-hidden="true" tabindex="-1"></a>Keep features observed in ≥50% of runs within at least one condition</span>
-<span id="cb50-135"><a href="#cb50-135" aria-hidden="true" tabindex="-1"></a>(≥ 2 of 4 samples in WT or ≥ 2 of 4 samples in KO).</span>
-<span id="cb50-136"><a href="#cb50-136" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-137"><a href="#cb50-137" aria-hidden="true" tabindex="-1"></a><span class="in">```{r eval=FALSE}</span></span>
-<span id="cb50-138"><a href="#cb50-138" aria-hidden="true" tabindex="-1"></a><span class="in"># Manual resume — skip rebuild on re-run</span></span>
-<span id="cb50-139"><a href="#cb50-139" aria-hidden="true" tabindex="-1"></a><span class="in">msstats_input &lt;- qs_read(file.path(objects_dir, "msstats_input.qs2"))</span></span>
-<span id="cb50-140"><a href="#cb50-140" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-141"><a href="#cb50-141" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-144"><a href="#cb50-144" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb50-145"><a href="#cb50-145" aria-hidden="true" tabindex="-1"></a>msstats_input_filt <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(msstats_input) <span class="sc">%&gt;%</span></span>
-<span id="cb50-146"><a href="#cb50-146" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ProteinName, PeptideSequence, PrecursorCharge,</span>
-<span id="cb50-147"><a href="#cb50-147" aria-hidden="true" tabindex="-1"></a>           FragmentIon, ProductCharge, Condition) <span class="sc">%&gt;%</span></span>
-<span id="cb50-148"><a href="#cb50-148" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
-<span id="cb50-149"><a href="#cb50-149" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_obs   =</span> <span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(Intensity) <span class="sc">&amp;</span> Intensity <span class="sc">&gt;</span> <span class="dv">0</span>),</span>
-<span id="cb50-150"><a href="#cb50-150" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_total =</span> <span class="fu">n</span>(),</span>
-<span id="cb50-151"><a href="#cb50-151" aria-hidden="true" tabindex="-1"></a>    <span class="at">prop    =</span> n_obs <span class="sc">/</span> n_total,</span>
-<span id="cb50-152"><a href="#cb50-152" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
-<span id="cb50-153"><a href="#cb50-153" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb50-154"><a href="#cb50-154" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ProteinName, PeptideSequence, PrecursorCharge,</span>
-<span id="cb50-155"><a href="#cb50-155" aria-hidden="true" tabindex="-1"></a>           FragmentIon, ProductCharge) <span class="sc">%&gt;%</span></span>
-<span id="cb50-156"><a href="#cb50-156" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">any</span>(prop <span class="sc">&gt;=</span> <span class="fl">0.5</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb50-157"><a href="#cb50-157" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb50-158"><a href="#cb50-158" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(</span>
-<span id="cb50-159"><a href="#cb50-159" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as.data.frame</span>(msstats_input),</span>
-<span id="cb50-160"><a href="#cb50-160" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"ProteinName"</span>, <span class="st">"PeptideSequence"</span>, <span class="st">"PrecursorCharge"</span>,</span>
-<span id="cb50-161"><a href="#cb50-161" aria-hidden="true" tabindex="-1"></a>           <span class="st">"FragmentIon"</span>, <span class="st">"ProductCharge"</span>, <span class="st">"Condition"</span>)</span>
-<span id="cb50-162"><a href="#cb50-162" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb50-163"><a href="#cb50-163" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-164"><a href="#cb50-164" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"Rows before completeness filter: "</span>, <span class="fu">nrow</span>(msstats_input))</span>
-<span id="cb50-165"><a href="#cb50-165" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"Rows after  completeness filter: "</span>, <span class="fu">nrow</span>(msstats_input_filt))</span>
-<span id="cb50-166"><a href="#cb50-166" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"Proteins retained: "</span>, <span class="fu">uniqueN</span>(msstats_input_filt<span class="sc">$</span>ProteinName))</span>
-<span id="cb50-167"><a href="#cb50-167" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-168"><a href="#cb50-168" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-169"><a href="#cb50-169" aria-hidden="true" tabindex="-1"></a><span class="fu">## Data summarisation and normalisation</span></span>
-<span id="cb50-170"><a href="#cb50-170" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-171"><a href="#cb50-171" aria-hidden="true" tabindex="-1"></a>Summarises fragment intensities to protein level with TMP, median normalisation,</span>
-<span id="cb50-172"><a href="#cb50-172" aria-hidden="true" tabindex="-1"></a>and model-based imputation for missing values.</span>
-<span id="cb50-173"><a href="#cb50-173" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-176"><a href="#cb50-176" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb50-177"><a href="#cb50-177" aria-hidden="true" tabindex="-1"></a>processed_data <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">dataProcess</span>(</span>
-<span id="cb50-178"><a href="#cb50-178" aria-hidden="true" tabindex="-1"></a>  msstats_input_filt,</span>
-<span id="cb50-179"><a href="#cb50-179" aria-hidden="true" tabindex="-1"></a>  <span class="at">normalization                        =</span> <span class="st">"equalizeMedians"</span>,</span>
-<span id="cb50-180"><a href="#cb50-180" aria-hidden="true" tabindex="-1"></a>  <span class="at">summaryMethod                        =</span> <span class="st">"TMP"</span>,</span>
-<span id="cb50-181"><a href="#cb50-181" aria-hidden="true" tabindex="-1"></a>  <span class="at">censoredInt                          =</span> <span class="st">"NA"</span>,</span>
-<span id="cb50-182"><a href="#cb50-182" aria-hidden="true" tabindex="-1"></a>  <span class="at">MBimpute                             =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb50-183"><a href="#cb50-183" aria-hidden="true" tabindex="-1"></a>  <span class="at">featureSubset                        =</span> <span class="st">"highQuality"</span>,</span>
-<span id="cb50-184"><a href="#cb50-184" aria-hidden="true" tabindex="-1"></a>  <span class="at">remove_uninformative_feature_outlier =</span> <span class="cn">TRUE</span></span>
-<span id="cb50-185"><a href="#cb50-185" aria-hidden="true" tabindex="-1"></a>))</span>
-<span id="cb50-186"><a href="#cb50-186" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-187"><a href="#cb50-187" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(processed_data, <span class="fu">file.path</span>(objects_dir, <span class="st">"processed_msstats_data.qs2"</span>))</span>
-<span id="cb50-188"><a href="#cb50-188" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-189"><a href="#cb50-189" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-190"><a href="#cb50-190" aria-hidden="true" tabindex="-1"></a><span class="fu">## Reload processed data (if re-running from this point)</span></span>
-<span id="cb50-191"><a href="#cb50-191" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-192"><a href="#cb50-192" aria-hidden="true" tabindex="-1"></a><span class="in">```{r eval=FALSE}</span></span>
-<span id="cb50-193"><a href="#cb50-193" aria-hidden="true" tabindex="-1"></a><span class="in">processed_data &lt;- qs_read(file.path(objects_dir, "processed_msstats_data.qs2"))</span></span>
-<span id="cb50-194"><a href="#cb50-194" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-195"><a href="#cb50-195" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-196"><a href="#cb50-196" aria-hidden="true" tabindex="-1"></a><span class="fu">## Verify condition levels</span></span>
-<span id="cb50-197"><a href="#cb50-197" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-198"><a href="#cb50-198" aria-hidden="true" tabindex="-1"></a>MSstats sorts conditions alphabetically — confirm the order before building the</span>
-<span id="cb50-199"><a href="#cb50-199" aria-hidden="true" tabindex="-1"></a>contrast matrix. Expected: "KO" then "WT".</span>
-<span id="cb50-200"><a href="#cb50-200" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-203"><a href="#cb50-203" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb50-204"><a href="#cb50-204" aria-hidden="true" tabindex="-1"></a>condition_levels <span class="ot">&lt;-</span> <span class="fu">levels</span>(processed_data<span class="sc">$</span>ProteinLevelData<span class="sc">$</span>GROUP)</span>
-<span id="cb50-205"><a href="#cb50-205" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Condition levels (alphabetical):</span><span class="sc">\n</span><span class="st">"</span>)</span>
-<span id="cb50-206"><a href="#cb50-206" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(condition_levels)</span>
-<span id="cb50-207"><a href="#cb50-207" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-208"><a href="#cb50-208" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-209"><a href="#cb50-209" aria-hidden="true" tabindex="-1"></a><span class="fu">## Build contrast matrix</span></span>
-<span id="cb50-210"><a href="#cb50-210" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-211"><a href="#cb50-211" aria-hidden="true" tabindex="-1"></a>Single comparison: KO vs WT. Positive log2FC = higher abundance in KO.</span>
-<span id="cb50-212"><a href="#cb50-212" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-215"><a href="#cb50-215" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb50-216"><a href="#cb50-216" aria-hidden="true" tabindex="-1"></a>make_contrast <span class="ot">&lt;-</span> <span class="cf">function</span>(numerator, denominator, levels) {</span>
-<span id="cb50-217"><a href="#cb50-217" aria-hidden="true" tabindex="-1"></a>  v <span class="ot">&lt;-</span> <span class="fu">setNames</span>(<span class="fu">rep</span>(<span class="dv">0</span>L, <span class="fu">length</span>(levels)), levels)</span>
-<span id="cb50-218"><a href="#cb50-218" aria-hidden="true" tabindex="-1"></a>  v[numerator]   <span class="ot">&lt;-</span>  <span class="dv">1</span>L</span>
-<span id="cb50-219"><a href="#cb50-219" aria-hidden="true" tabindex="-1"></a>  v[denominator] <span class="ot">&lt;-</span> <span class="sc">-</span><span class="dv">1</span>L</span>
-<span id="cb50-220"><a href="#cb50-220" aria-hidden="true" tabindex="-1"></a>  v</span>
-<span id="cb50-221"><a href="#cb50-221" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb50-222"><a href="#cb50-222" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-223"><a href="#cb50-223" aria-hidden="true" tabindex="-1"></a>comparison_matrix <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
-<span id="cb50-224"><a href="#cb50-224" aria-hidden="true" tabindex="-1"></a>  <span class="fu">make_contrast</span>(<span class="st">"KO"</span>, <span class="st">"WT"</span>, condition_levels)</span>
-<span id="cb50-225"><a href="#cb50-225" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb50-226"><a href="#cb50-226" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(comparison_matrix) <span class="ot">&lt;-</span> <span class="st">"KO_vs_WT"</span></span>
-<span id="cb50-227"><a href="#cb50-227" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-228"><a href="#cb50-228" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(comparison_matrix)</span>
-<span id="cb50-229"><a href="#cb50-229" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-230"><a href="#cb50-230" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-231"><a href="#cb50-231" aria-hidden="true" tabindex="-1"></a><span class="fu">## Statistical modelling</span></span>
-<span id="cb50-232"><a href="#cb50-232" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-233"><a href="#cb50-233" aria-hidden="true" tabindex="-1"></a>Linear mixed-effects model across all proteins.</span>
-<span id="cb50-234"><a href="#cb50-234" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-237"><a href="#cb50-237" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb50-238"><a href="#cb50-238" aria-hidden="true" tabindex="-1"></a>test_results <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(</span>
-<span id="cb50-239"><a href="#cb50-239" aria-hidden="true" tabindex="-1"></a>  <span class="fu">groupComparison</span>(<span class="at">contrast.matrix =</span> comparison_matrix, <span class="at">data =</span> processed_data)</span>
-<span id="cb50-240"><a href="#cb50-240" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb50-241"><a href="#cb50-241" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-242"><a href="#cb50-242" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(test_results, <span class="fu">file.path</span>(objects_dir, <span class="st">"comparison_results.qs2"</span>))</span>
-<span id="cb50-243"><a href="#cb50-243" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-244"><a href="#cb50-244" aria-hidden="true" tabindex="-1"></a>res_df <span class="ot">&lt;-</span> <span class="fu">as.data.table</span>(test_results<span class="sc">$</span>ComparisonResult)</span>
-<span id="cb50-245"><a href="#cb50-245" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Total protein-comparison rows:"</span>, <span class="fu">nrow</span>(res_df), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
-<span id="cb50-246"><a href="#cb50-246" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Significant (adj.pvalue &lt; 0.05):"</span>,</span>
-<span id="cb50-247"><a href="#cb50-247" aria-hidden="true" tabindex="-1"></a>    <span class="fu">nrow</span>(res_df[adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span>, ]), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
-<span id="cb50-248"><a href="#cb50-248" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-249"><a href="#cb50-249" aria-hidden="true" tabindex="-1"></a><span class="fu">fwrite</span>(res_df, <span class="fu">file.path</span>(results_dir, <span class="st">"Full_GroupComparison_Results.csv"</span>))</span>
-<span id="cb50-250"><a href="#cb50-250" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-251"><a href="#cb50-251" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-252"><a href="#cb50-252" aria-hidden="true" tabindex="-1"></a><span class="fu">## Summary of results</span></span>
-<span id="cb50-253"><a href="#cb50-253" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-256"><a href="#cb50-256" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
-<span id="cb50-257"><a href="#cb50-257" aria-hidden="true" tabindex="-1"></a>res_df <span class="sc">%&gt;%</span></span>
-<span id="cb50-258"><a href="#cb50-258" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(adj.pvalue)) <span class="sc">%&gt;%</span></span>
-<span id="cb50-259"><a href="#cb50-259" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Label) <span class="sc">%&gt;%</span></span>
-<span id="cb50-260"><a href="#cb50-260" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
-<span id="cb50-261"><a href="#cb50-261" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_tested =</span> <span class="fu">n</span>(),</span>
-<span id="cb50-262"><a href="#cb50-262" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_sig    =</span> <span class="fu">sum</span>(adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
-<span id="cb50-263"><a href="#cb50-263" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_up     =</span> <span class="fu">sum</span>(adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span> <span class="sc">&amp;</span> log2FC <span class="sc">&gt;</span> <span class="dv">0</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
-<span id="cb50-264"><a href="#cb50-264" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_down   =</span> <span class="fu">sum</span>(adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span> <span class="sc">&amp;</span> log2FC <span class="sc">&lt;</span> <span class="dv">0</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
-<span id="cb50-265"><a href="#cb50-265" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups  =</span> <span class="st">"drop"</span></span>
-<span id="cb50-266"><a href="#cb50-266" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb50-267"><a href="#cb50-267" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
-<span id="cb50-268"><a href="#cb50-268" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-269"><a href="#cb50-269" aria-hidden="true" tabindex="-1"></a><span class="fu">## Reload comparison results (if re-running from this point)</span></span>
-<span id="cb50-270"><a href="#cb50-270" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb50-271"><a href="#cb50-271" aria-hidden="true" tabindex="-1"></a><span class="in">```{r eval=FALSE}</span></span>
-<span id="cb50-272"><a href="#cb50-272" aria-hidden="true" tabindex="-1"></a><span class="in">test_results &lt;- qs_read(file.path(objects_dir, "comparison_results.qs2"))</span></span>
-<span id="cb50-273"><a href="#cb50-273" aria-hidden="true" tabindex="-1"></a><span class="in">res_df       &lt;- as.data.table(test_results$ComparisonResult)</span></span>
-<span id="cb50-274"><a href="#cb50-274" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<div class="sourceCode" id="cb60" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "2. MSstats — Differential Abundance Analysis"</span></span>
+<span id="cb60-3"><a href="#cb60-3" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb60-4"><a href="#cb60-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-5"><a href="#cb60-5" aria-hidden="true" tabindex="-1"></a><span class="fu">## Libraries</span></span>
+<span id="cb60-6"><a href="#cb60-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-7"><a href="#cb60-7" aria-hidden="true" tabindex="-1"></a><span class="in">```{r setup, include=TRUE, message=FALSE}</span></span>
+<span id="cb60-8"><a href="#cb60-8" aria-hidden="true" tabindex="-1"></a><span class="in">library(data.table)</span></span>
+<span id="cb60-9"><a href="#cb60-9" aria-hidden="true" tabindex="-1"></a><span class="in">library(MSstats)</span></span>
+<span id="cb60-10"><a href="#cb60-10" aria-hidden="true" tabindex="-1"></a><span class="in">library(qs2)</span></span>
+<span id="cb60-11"><a href="#cb60-11" aria-hidden="true" tabindex="-1"></a><span class="in">library(dplyr)</span></span>
+<span id="cb60-12"><a href="#cb60-12" aria-hidden="true" tabindex="-1"></a><span class="in">library(ggplot2)</span></span>
+<span id="cb60-13"><a href="#cb60-13" aria-hidden="true" tabindex="-1"></a><span class="in">library(ggrepel)</span></span>
+<span id="cb60-14"><a href="#cb60-14" aria-hidden="true" tabindex="-1"></a><span class="in">library(tidyverse)</span></span>
+<span id="cb60-15"><a href="#cb60-15" aria-hidden="true" tabindex="-1"></a><span class="in">library(readr)</span></span>
+<span id="cb60-16"><a href="#cb60-16" aria-hidden="true" tabindex="-1"></a><span class="in">library(AnnotationDbi)</span></span>
+<span id="cb60-17"><a href="#cb60-17" aria-hidden="true" tabindex="-1"></a><span class="in">library(org.Hs.eg.db)</span></span>
+<span id="cb60-18"><a href="#cb60-18" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-19"><a href="#cb60-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-20"><a href="#cb60-20" aria-hidden="true" tabindex="-1"></a><span class="fu">## Set directories</span></span>
+<span id="cb60-21"><a href="#cb60-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-24"><a href="#cb60-24" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb60-25"><a href="#cb60-25" aria-hidden="true" tabindex="-1"></a>base_dir    <span class="ot">&lt;-</span> <span class="st">"/nemo/lab/destrooperb/home/shared/zanettc/dom_proteomics"</span></span>
+<span id="cb60-26"><a href="#cb60-26" aria-hidden="true" tabindex="-1"></a>run_num     <span class="ot">&lt;-</span> <span class="st">"run2"</span></span>
+<span id="cb60-27"><a href="#cb60-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-28"><a href="#cb60-28" aria-hidden="true" tabindex="-1"></a>results_dir <span class="ot">&lt;-</span> <span class="fu">file.path</span>(base_dir, <span class="st">"results"</span>, run_num)</span>
+<span id="cb60-29"><a href="#cb60-29" aria-hidden="true" tabindex="-1"></a>objects_dir <span class="ot">&lt;-</span> <span class="fu">file.path</span>(base_dir, <span class="st">"data"</span>, <span class="st">"processed"</span>, run_num)</span>
+<span id="cb60-30"><a href="#cb60-30" aria-hidden="true" tabindex="-1"></a>input_dir   <span class="ot">&lt;-</span> <span class="fu">file.path</span>(base_dir, <span class="st">"data"</span>, <span class="st">"inputs"</span>,</span>
+<span id="cb60-31"><a href="#cb60-31" aria-hidden="true" tabindex="-1"></a>                         <span class="st">"2026_04_23_SORL1_mg_total_proteomics"</span>)</span>
+<span id="cb60-32"><a href="#cb60-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-33"><a href="#cb60-33" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(results_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb60-34"><a href="#cb60-34" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(objects_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb60-35"><a href="#cb60-35" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-36"><a href="#cb60-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-37"><a href="#cb60-37" aria-hidden="true" tabindex="-1"></a><span class="fu">## Build annotation from study design</span></span>
+<span id="cb60-38"><a href="#cb60-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-39"><a href="#cb60-39" aria-hidden="true" tabindex="-1"></a>All 8 samples passed QC. R.Condition in the raw file is "Not Defined" — we assign</span>
+<span id="cb60-40"><a href="#cb60-40" aria-hidden="true" tabindex="-1"></a>WT/KO here from the known sample table.</span>
+<span id="cb60-41"><a href="#cb60-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-42"><a href="#cb60-42" aria-hidden="true" tabindex="-1"></a>Note: WT samples are all Male (BDAG171 cohort); KO samples are 2 Female + 2 Male</span>
+<span id="cb60-43"><a href="#cb60-43" aria-hidden="true" tabindex="-1"></a>(BDAG173 cohort). Sex is not modelled as a covariate in the MSstats linear model —</span>
+<span id="cb60-44"><a href="#cb60-44" aria-hidden="true" tabindex="-1"></a>the KO vs WT contrast is therefore partially confounded with sex.</span>
+<span id="cb60-45"><a href="#cb60-45" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-48"><a href="#cb60-48" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb60-49"><a href="#cb60-49" aria-hidden="true" tabindex="-1"></a>msstats_annotation <span class="ot">&lt;-</span> <span class="fu">data.table</span>(</span>
+<span id="cb60-50"><a href="#cb60-50" aria-hidden="true" tabindex="-1"></a>  <span class="at">Run =</span> <span class="fu">c</span>(</span>
+<span id="cb60-51"><a href="#cb60-51" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ds12_S5-A1_1_6411"</span>, <span class="st">"ds11_S5-A2_1_6412"</span>,</span>
+<span id="cb60-52"><a href="#cb60-52" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ds22_S5-A3_1_6413"</span>, <span class="st">"ds21_S5-A4_1_6414"</span>,</span>
+<span id="cb60-53"><a href="#cb60-53" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ds51_S5-A9_1_6421"</span>, <span class="st">"ds51_S5-A10_1_6422"</span>,</span>
+<span id="cb60-54"><a href="#cb60-54" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ds61_S5-A11_1_6423"</span>, <span class="st">"ds62_S5-A12_1_6424"</span></span>
+<span id="cb60-55"><a href="#cb60-55" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb60-56"><a href="#cb60-56" aria-hidden="true" tabindex="-1"></a>  <span class="at">Condition    =</span> <span class="fu">c</span>(<span class="fu">rep</span>(<span class="st">"WT"</span>, <span class="dv">4</span>), <span class="fu">rep</span>(<span class="st">"KO"</span>, <span class="dv">4</span>)),</span>
+<span id="cb60-57"><a href="#cb60-57" aria-hidden="true" tabindex="-1"></a>  <span class="at">BioReplicate =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span></span>
+<span id="cb60-58"><a href="#cb60-58" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb60-59"><a href="#cb60-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-60"><a href="#cb60-60" aria-hidden="true" tabindex="-1"></a>msstats_annotation</span>
+<span id="cb60-61"><a href="#cb60-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-62"><a href="#cb60-62" aria-hidden="true" tabindex="-1"></a><span class="fu">fwrite</span>(msstats_annotation, <span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_annotation.csv"</span>))</span>
+<span id="cb60-63"><a href="#cb60-63" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-64"><a href="#cb60-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-65"><a href="#cb60-65" aria-hidden="true" tabindex="-1"></a><span class="fu">## Load raw Spectronaut report</span></span>
+<span id="cb60-66"><a href="#cb60-66" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-67"><a href="#cb60-67" aria-hidden="true" tabindex="-1"></a>Select only the fragment-level columns required by MSstats to keep memory manageable.</span>
+<span id="cb60-68"><a href="#cb60-68" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-71"><a href="#cb60-71" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb60-72"><a href="#cb60-72" aria-hidden="true" tabindex="-1"></a>msstats_cols <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb60-73"><a href="#cb60-73" aria-hidden="true" tabindex="-1"></a>  <span class="st">"R.Condition"</span>, <span class="st">"R.FileName"</span>, <span class="st">"R.Replicate"</span>,</span>
+<span id="cb60-74"><a href="#cb60-74" aria-hidden="true" tabindex="-1"></a>  <span class="st">"PG.ProteinGroups"</span>, <span class="st">"PG.ProteinAccessions"</span>,</span>
+<span id="cb60-75"><a href="#cb60-75" aria-hidden="true" tabindex="-1"></a>  <span class="st">"PEP.StrippedSequence"</span>,</span>
+<span id="cb60-76"><a href="#cb60-76" aria-hidden="true" tabindex="-1"></a>  <span class="st">"EG.ModifiedSequence"</span>, <span class="st">"EG.PrecursorId"</span>, <span class="st">"EG.Qvalue"</span>,</span>
+<span id="cb60-77"><a href="#cb60-77" aria-hidden="true" tabindex="-1"></a>  <span class="st">"FG.Charge"</span>, <span class="st">"FG.Id"</span>,</span>
+<span id="cb60-78"><a href="#cb60-78" aria-hidden="true" tabindex="-1"></a>  <span class="st">"F.FrgIon"</span>, <span class="st">"F.Charge"</span>, <span class="st">"F.FrgLossType"</span>, <span class="st">"F.FrgNum"</span>, <span class="st">"F.FrgType"</span>,</span>
+<span id="cb60-79"><a href="#cb60-79" aria-hidden="true" tabindex="-1"></a>  <span class="st">"F.NormalizedPeakArea"</span>, <span class="st">"F.PeakArea"</span>, <span class="st">"F.ExcludedFromQuantification"</span></span>
+<span id="cb60-80"><a href="#cb60-80" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb60-81"><a href="#cb60-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-82"><a href="#cb60-82" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Reading Spectronaut report...</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb60-83"><a href="#cb60-83" aria-hidden="true" tabindex="-1"></a>raw_spectronaut <span class="ot">&lt;-</span> <span class="fu">fread</span>(</span>
+<span id="cb60-84"><a href="#cb60-84" aria-hidden="true" tabindex="-1"></a>  <span class="fu">file.path</span>(input_dir, <span class="st">"20260423_094931_S5-A10_Report_human.tsv"</span>),</span>
+<span id="cb60-85"><a href="#cb60-85" aria-hidden="true" tabindex="-1"></a>  <span class="at">select =</span> msstats_cols</span>
+<span id="cb60-86"><a href="#cb60-86" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb60-87"><a href="#cb60-87" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Rows loaded:"</span>, <span class="fu">nrow</span>(raw_spectronaut), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb60-88"><a href="#cb60-88" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-89"><a href="#cb60-89" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-90"><a href="#cb60-90" aria-hidden="true" tabindex="-1"></a><span class="fu">## Filter to human proteins</span></span>
+<span id="cb60-91"><a href="#cb60-91" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-92"><a href="#cb60-92" aria-hidden="true" tabindex="-1"></a>The Spectronaut search used a concatenated human + mouse FASTA (see notebook 04).</span>
+<span id="cb60-93"><a href="#cb60-93" aria-hidden="true" tabindex="-1"></a>Retain only rows whose primary protein group accession maps to <span class="in">`org.Hs.eg.db`</span> so</span>
+<span id="cb60-94"><a href="#cb60-94" aria-hidden="true" tabindex="-1"></a>that mouse host-derived proteins are excluded before MSstats sees the data.</span>
+<span id="cb60-95"><a href="#cb60-95" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-98"><a href="#cb60-98" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb60-99"><a href="#cb60-99" aria-hidden="true" tabindex="-1"></a>prim_acc  <span class="ot">&lt;-</span> <span class="fu">str_extract</span>(raw_spectronaut<span class="sc">$</span>PG.ProteinGroups, <span class="st">"^[^;]+"</span>)</span>
+<span id="cb60-100"><a href="#cb60-100" aria-hidden="true" tabindex="-1"></a>human_map <span class="ot">&lt;-</span> <span class="fu">mapIds</span>(org.Hs.eg.db, <span class="fu">unique</span>(prim_acc),</span>
+<span id="cb60-101"><a href="#cb60-101" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"SYMBOL"</span>, <span class="st">"UNIPROT"</span>, <span class="at">multiVals =</span> <span class="st">"first"</span>)</span>
+<span id="cb60-102"><a href="#cb60-102" aria-hidden="true" tabindex="-1"></a>human_acc <span class="ot">&lt;-</span> <span class="fu">names</span>(human_map)[<span class="sc">!</span><span class="fu">is.na</span>(human_map)]</span>
+<span id="cb60-103"><a href="#cb60-103" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-104"><a href="#cb60-104" aria-hidden="true" tabindex="-1"></a>n_pg_before <span class="ot">&lt;-</span> <span class="fu">uniqueN</span>(raw_spectronaut<span class="sc">$</span>PG.ProteinGroups)</span>
+<span id="cb60-105"><a href="#cb60-105" aria-hidden="true" tabindex="-1"></a>raw_spectronaut <span class="ot">&lt;-</span> raw_spectronaut[prim_acc <span class="sc">%in%</span> human_acc]</span>
+<span id="cb60-106"><a href="#cb60-106" aria-hidden="true" tabindex="-1"></a>n_pg_after  <span class="ot">&lt;-</span> <span class="fu">uniqueN</span>(raw_spectronaut<span class="sc">$</span>PG.ProteinGroups)</span>
+<span id="cb60-107"><a href="#cb60-107" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-108"><a href="#cb60-108" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Protein groups before human filter:"</span>, n_pg_before, <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb60-109"><a href="#cb60-109" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Protein groups after  human filter:"</span>, n_pg_after,  <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb60-110"><a href="#cb60-110" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Mouse protein groups removed:      "</span>, n_pg_before <span class="sc">-</span> n_pg_after, <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb60-111"><a href="#cb60-111" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-112"><a href="#cb60-112" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(raw_spectronaut, <span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_report.qs2"</span>))</span>
+<span id="cb60-113"><a href="#cb60-113" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-114"><a href="#cb60-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-115"><a href="#cb60-115" aria-hidden="true" tabindex="-1"></a><span class="fu">## Reload from .qs2 (skip read on re-runs)</span></span>
+<span id="cb60-116"><a href="#cb60-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-117"><a href="#cb60-117" aria-hidden="true" tabindex="-1"></a><span class="in">```{r eval=FALSE}</span></span>
+<span id="cb60-118"><a href="#cb60-118" aria-hidden="true" tabindex="-1"></a><span class="in">raw_spectronaut &lt;- qs_read(file.path(objects_dir, "msstats_report.qs2"))</span></span>
+<span id="cb60-119"><a href="#cb60-119" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-120"><a href="#cb60-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-121"><a href="#cb60-121" aria-hidden="true" tabindex="-1"></a><span class="fu">## Overwrite R.Condition and R.Replicate with study design values</span></span>
+<span id="cb60-122"><a href="#cb60-122" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-125"><a href="#cb60-125" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb60-126"><a href="#cb60-126" aria-hidden="true" tabindex="-1"></a>raw_spectronaut[msstats_annotation,</span>
+<span id="cb60-127"><a href="#cb60-127" aria-hidden="true" tabindex="-1"></a>                on <span class="ot">=</span> <span class="fu">c</span>(<span class="st">"R.FileName"</span> <span class="ot">=</span> <span class="st">"Run"</span>),</span>
+<span id="cb60-128"><a href="#cb60-128" aria-hidden="true" tabindex="-1"></a>                <span class="st">`</span><span class="at">:=</span><span class="st">`</span>(<span class="at">R.Condition =</span> i.Condition,</span>
+<span id="cb60-129"><a href="#cb60-129" aria-hidden="true" tabindex="-1"></a>                     <span class="at">R.Replicate =</span> i.BioReplicate)]</span>
+<span id="cb60-130"><a href="#cb60-130" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-131"><a href="#cb60-131" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Condition distribution after fix:</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb60-132"><a href="#cb60-132" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(raw_spectronaut[, .N, <span class="at">by =</span> .(R.Condition, R.FileName)][<span class="fu">order</span>(R.Condition, R.FileName)])</span>
+<span id="cb60-133"><a href="#cb60-133" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-134"><a href="#cb60-134" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-135"><a href="#cb60-135" aria-hidden="true" tabindex="-1"></a><span class="fu">## Convert to MSstats input format</span></span>
+<span id="cb60-136"><a href="#cb60-136" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-137"><a href="#cb60-137" aria-hidden="true" tabindex="-1"></a>Feature-level filtering: Qvalue &lt; 0.01, remove features with too few measurements.</span>
+<span id="cb60-138"><a href="#cb60-138" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-141"><a href="#cb60-141" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb60-142"><a href="#cb60-142" aria-hidden="true" tabindex="-1"></a>msstats_input <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">SpectronauttoMSstatsFormat</span>(</span>
+<span id="cb60-143"><a href="#cb60-143" aria-hidden="true" tabindex="-1"></a>  raw_spectronaut,</span>
+<span id="cb60-144"><a href="#cb60-144" aria-hidden="true" tabindex="-1"></a>  <span class="at">annotation                 =</span> msstats_annotation,</span>
+<span id="cb60-145"><a href="#cb60-145" aria-hidden="true" tabindex="-1"></a>  <span class="at">filter_with_Qvalue         =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb60-146"><a href="#cb60-146" aria-hidden="true" tabindex="-1"></a>  <span class="at">qvalue_cutoff              =</span> <span class="fl">0.01</span>,</span>
+<span id="cb60-147"><a href="#cb60-147" aria-hidden="true" tabindex="-1"></a>  <span class="at">fewMeasurements            =</span> <span class="st">"remove"</span>,</span>
+<span id="cb60-148"><a href="#cb60-148" aria-hidden="true" tabindex="-1"></a>  <span class="at">removeProtein_with1Feature =</span> <span class="cn">FALSE</span></span>
+<span id="cb60-149"><a href="#cb60-149" aria-hidden="true" tabindex="-1"></a>))</span>
+<span id="cb60-150"><a href="#cb60-150" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-151"><a href="#cb60-151" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"MSstats input rows:"</span>, <span class="fu">nrow</span>(msstats_input), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb60-152"><a href="#cb60-152" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Unique proteins:   "</span>, <span class="fu">uniqueN</span>(msstats_input<span class="sc">$</span>ProteinName), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb60-153"><a href="#cb60-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-154"><a href="#cb60-154" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(msstats_input, <span class="fu">file.path</span>(objects_dir, <span class="st">"msstats_input.qs2"</span>))</span>
+<span id="cb60-155"><a href="#cb60-155" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-156"><a href="#cb60-156" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-157"><a href="#cb60-157" aria-hidden="true" tabindex="-1"></a><span class="fu">## Feature completeness filter</span></span>
+<span id="cb60-158"><a href="#cb60-158" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-159"><a href="#cb60-159" aria-hidden="true" tabindex="-1"></a>Keep features observed in ≥50% of runs within at least one condition</span>
+<span id="cb60-160"><a href="#cb60-160" aria-hidden="true" tabindex="-1"></a>(≥ 2 of 4 samples in WT or ≥ 2 of 4 samples in KO).</span>
+<span id="cb60-161"><a href="#cb60-161" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-162"><a href="#cb60-162" aria-hidden="true" tabindex="-1"></a><span class="in">```{r eval=FALSE}</span></span>
+<span id="cb60-163"><a href="#cb60-163" aria-hidden="true" tabindex="-1"></a><span class="in"># Manual resume — skip rebuild on re-run</span></span>
+<span id="cb60-164"><a href="#cb60-164" aria-hidden="true" tabindex="-1"></a><span class="in">msstats_input &lt;- qs_read(file.path(objects_dir, "msstats_input.qs2"))</span></span>
+<span id="cb60-165"><a href="#cb60-165" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-166"><a href="#cb60-166" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-169"><a href="#cb60-169" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb60-170"><a href="#cb60-170" aria-hidden="true" tabindex="-1"></a>msstats_input_filt <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(msstats_input) <span class="sc">%&gt;%</span></span>
+<span id="cb60-171"><a href="#cb60-171" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ProteinName, PeptideSequence, PrecursorCharge,</span>
+<span id="cb60-172"><a href="#cb60-172" aria-hidden="true" tabindex="-1"></a>           FragmentIon, ProductCharge, Condition) <span class="sc">%&gt;%</span></span>
+<span id="cb60-173"><a href="#cb60-173" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb60-174"><a href="#cb60-174" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_obs   =</span> <span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(Intensity) <span class="sc">&amp;</span> Intensity <span class="sc">&gt;</span> <span class="dv">0</span>),</span>
+<span id="cb60-175"><a href="#cb60-175" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_total =</span> <span class="fu">n</span>(),</span>
+<span id="cb60-176"><a href="#cb60-176" aria-hidden="true" tabindex="-1"></a>    <span class="at">prop    =</span> n_obs <span class="sc">/</span> n_total,</span>
+<span id="cb60-177"><a href="#cb60-177" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb60-178"><a href="#cb60-178" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb60-179"><a href="#cb60-179" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(ProteinName, PeptideSequence, PrecursorCharge,</span>
+<span id="cb60-180"><a href="#cb60-180" aria-hidden="true" tabindex="-1"></a>           FragmentIon, ProductCharge) <span class="sc">%&gt;%</span></span>
+<span id="cb60-181"><a href="#cb60-181" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">any</span>(prop <span class="sc">&gt;=</span> <span class="fl">0.5</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb60-182"><a href="#cb60-182" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb60-183"><a href="#cb60-183" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(</span>
+<span id="cb60-184"><a href="#cb60-184" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as.data.frame</span>(msstats_input),</span>
+<span id="cb60-185"><a href="#cb60-185" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"ProteinName"</span>, <span class="st">"PeptideSequence"</span>, <span class="st">"PrecursorCharge"</span>,</span>
+<span id="cb60-186"><a href="#cb60-186" aria-hidden="true" tabindex="-1"></a>           <span class="st">"FragmentIon"</span>, <span class="st">"ProductCharge"</span>, <span class="st">"Condition"</span>)</span>
+<span id="cb60-187"><a href="#cb60-187" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb60-188"><a href="#cb60-188" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-189"><a href="#cb60-189" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"Rows before completeness filter: "</span>, <span class="fu">nrow</span>(msstats_input))</span>
+<span id="cb60-190"><a href="#cb60-190" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"Rows after  completeness filter: "</span>, <span class="fu">nrow</span>(msstats_input_filt))</span>
+<span id="cb60-191"><a href="#cb60-191" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">"Proteins retained: "</span>, <span class="fu">uniqueN</span>(msstats_input_filt<span class="sc">$</span>ProteinName))</span>
+<span id="cb60-192"><a href="#cb60-192" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-193"><a href="#cb60-193" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-194"><a href="#cb60-194" aria-hidden="true" tabindex="-1"></a><span class="fu">## Data summarisation and normalisation</span></span>
+<span id="cb60-195"><a href="#cb60-195" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-196"><a href="#cb60-196" aria-hidden="true" tabindex="-1"></a>Summarises fragment intensities to protein level with TMP, median normalisation,</span>
+<span id="cb60-197"><a href="#cb60-197" aria-hidden="true" tabindex="-1"></a>and model-based imputation for missing values.</span>
+<span id="cb60-198"><a href="#cb60-198" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-201"><a href="#cb60-201" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb60-202"><a href="#cb60-202" aria-hidden="true" tabindex="-1"></a>processed_data <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">dataProcess</span>(</span>
+<span id="cb60-203"><a href="#cb60-203" aria-hidden="true" tabindex="-1"></a>  msstats_input_filt,</span>
+<span id="cb60-204"><a href="#cb60-204" aria-hidden="true" tabindex="-1"></a>  <span class="at">normalization                        =</span> <span class="st">"equalizeMedians"</span>,</span>
+<span id="cb60-205"><a href="#cb60-205" aria-hidden="true" tabindex="-1"></a>  <span class="at">summaryMethod                        =</span> <span class="st">"TMP"</span>,</span>
+<span id="cb60-206"><a href="#cb60-206" aria-hidden="true" tabindex="-1"></a>  <span class="at">censoredInt                          =</span> <span class="st">"NA"</span>,</span>
+<span id="cb60-207"><a href="#cb60-207" aria-hidden="true" tabindex="-1"></a>  <span class="at">MBimpute                             =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb60-208"><a href="#cb60-208" aria-hidden="true" tabindex="-1"></a>  <span class="at">featureSubset                        =</span> <span class="st">"highQuality"</span>,</span>
+<span id="cb60-209"><a href="#cb60-209" aria-hidden="true" tabindex="-1"></a>  <span class="at">remove_uninformative_feature_outlier =</span> <span class="cn">TRUE</span></span>
+<span id="cb60-210"><a href="#cb60-210" aria-hidden="true" tabindex="-1"></a>))</span>
+<span id="cb60-211"><a href="#cb60-211" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-212"><a href="#cb60-212" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(processed_data, <span class="fu">file.path</span>(objects_dir, <span class="st">"processed_msstats_data.qs2"</span>))</span>
+<span id="cb60-213"><a href="#cb60-213" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-214"><a href="#cb60-214" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-215"><a href="#cb60-215" aria-hidden="true" tabindex="-1"></a><span class="fu">## Reload processed data (if re-running from this point)</span></span>
+<span id="cb60-216"><a href="#cb60-216" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-217"><a href="#cb60-217" aria-hidden="true" tabindex="-1"></a><span class="in">```{r eval=FALSE}</span></span>
+<span id="cb60-218"><a href="#cb60-218" aria-hidden="true" tabindex="-1"></a><span class="in">processed_data &lt;- qs_read(file.path(objects_dir, "processed_msstats_data.qs2"))</span></span>
+<span id="cb60-219"><a href="#cb60-219" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-220"><a href="#cb60-220" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-221"><a href="#cb60-221" aria-hidden="true" tabindex="-1"></a><span class="fu">## Verify condition levels</span></span>
+<span id="cb60-222"><a href="#cb60-222" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-223"><a href="#cb60-223" aria-hidden="true" tabindex="-1"></a>MSstats sorts conditions alphabetically — confirm the order before building the</span>
+<span id="cb60-224"><a href="#cb60-224" aria-hidden="true" tabindex="-1"></a>contrast matrix. Expected: "KO" then "WT".</span>
+<span id="cb60-225"><a href="#cb60-225" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-228"><a href="#cb60-228" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb60-229"><a href="#cb60-229" aria-hidden="true" tabindex="-1"></a>condition_levels <span class="ot">&lt;-</span> <span class="fu">levels</span>(processed_data<span class="sc">$</span>ProteinLevelData<span class="sc">$</span>GROUP)</span>
+<span id="cb60-230"><a href="#cb60-230" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Condition levels (alphabetical):</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb60-231"><a href="#cb60-231" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(condition_levels)</span>
+<span id="cb60-232"><a href="#cb60-232" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-233"><a href="#cb60-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-234"><a href="#cb60-234" aria-hidden="true" tabindex="-1"></a><span class="fu">## Build contrast matrix</span></span>
+<span id="cb60-235"><a href="#cb60-235" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-236"><a href="#cb60-236" aria-hidden="true" tabindex="-1"></a>Single comparison: KO vs WT. Positive log2FC = higher abundance in KO.</span>
+<span id="cb60-237"><a href="#cb60-237" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-240"><a href="#cb60-240" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb60-241"><a href="#cb60-241" aria-hidden="true" tabindex="-1"></a>make_contrast <span class="ot">&lt;-</span> <span class="cf">function</span>(numerator, denominator, levels) {</span>
+<span id="cb60-242"><a href="#cb60-242" aria-hidden="true" tabindex="-1"></a>  v <span class="ot">&lt;-</span> <span class="fu">setNames</span>(<span class="fu">rep</span>(<span class="dv">0</span>L, <span class="fu">length</span>(levels)), levels)</span>
+<span id="cb60-243"><a href="#cb60-243" aria-hidden="true" tabindex="-1"></a>  v[numerator]   <span class="ot">&lt;-</span>  <span class="dv">1</span>L</span>
+<span id="cb60-244"><a href="#cb60-244" aria-hidden="true" tabindex="-1"></a>  v[denominator] <span class="ot">&lt;-</span> <span class="sc">-</span><span class="dv">1</span>L</span>
+<span id="cb60-245"><a href="#cb60-245" aria-hidden="true" tabindex="-1"></a>  v</span>
+<span id="cb60-246"><a href="#cb60-246" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb60-247"><a href="#cb60-247" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-248"><a href="#cb60-248" aria-hidden="true" tabindex="-1"></a>comparison_matrix <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb60-249"><a href="#cb60-249" aria-hidden="true" tabindex="-1"></a>  <span class="fu">make_contrast</span>(<span class="st">"KO"</span>, <span class="st">"WT"</span>, condition_levels)</span>
+<span id="cb60-250"><a href="#cb60-250" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb60-251"><a href="#cb60-251" aria-hidden="true" tabindex="-1"></a><span class="fu">rownames</span>(comparison_matrix) <span class="ot">&lt;-</span> <span class="st">"KO_vs_WT"</span></span>
+<span id="cb60-252"><a href="#cb60-252" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-253"><a href="#cb60-253" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(comparison_matrix)</span>
+<span id="cb60-254"><a href="#cb60-254" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-255"><a href="#cb60-255" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-256"><a href="#cb60-256" aria-hidden="true" tabindex="-1"></a><span class="fu">## Statistical modelling</span></span>
+<span id="cb60-257"><a href="#cb60-257" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-258"><a href="#cb60-258" aria-hidden="true" tabindex="-1"></a>Linear mixed-effects model across all proteins.</span>
+<span id="cb60-259"><a href="#cb60-259" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-262"><a href="#cb60-262" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb60-263"><a href="#cb60-263" aria-hidden="true" tabindex="-1"></a>test_results <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(</span>
+<span id="cb60-264"><a href="#cb60-264" aria-hidden="true" tabindex="-1"></a>  <span class="fu">groupComparison</span>(<span class="at">contrast.matrix =</span> comparison_matrix, <span class="at">data =</span> processed_data)</span>
+<span id="cb60-265"><a href="#cb60-265" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb60-266"><a href="#cb60-266" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-267"><a href="#cb60-267" aria-hidden="true" tabindex="-1"></a><span class="fu">qs_save</span>(test_results, <span class="fu">file.path</span>(objects_dir, <span class="st">"comparison_results.qs2"</span>))</span>
+<span id="cb60-268"><a href="#cb60-268" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-269"><a href="#cb60-269" aria-hidden="true" tabindex="-1"></a>res_df <span class="ot">&lt;-</span> <span class="fu">as.data.table</span>(test_results<span class="sc">$</span>ComparisonResult)</span>
+<span id="cb60-270"><a href="#cb60-270" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Total protein-comparison rows:"</span>, <span class="fu">nrow</span>(res_df), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb60-271"><a href="#cb60-271" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Significant (adj.pvalue &lt; 0.05):"</span>,</span>
+<span id="cb60-272"><a href="#cb60-272" aria-hidden="true" tabindex="-1"></a>    <span class="fu">nrow</span>(res_df[adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span>, ]), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span>
+<span id="cb60-273"><a href="#cb60-273" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-274"><a href="#cb60-274" aria-hidden="true" tabindex="-1"></a><span class="fu">fwrite</span>(res_df, <span class="fu">file.path</span>(results_dir, <span class="st">"Full_GroupComparison_Results.csv"</span>))</span>
+<span id="cb60-275"><a href="#cb60-275" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-276"><a href="#cb60-276" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-277"><a href="#cb60-277" aria-hidden="true" tabindex="-1"></a><span class="fu">## Summary of results</span></span>
+<span id="cb60-278"><a href="#cb60-278" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-281"><a href="#cb60-281" aria-hidden="true" tabindex="-1"></a><span class="in">```{r}</span></span>
+<span id="cb60-282"><a href="#cb60-282" aria-hidden="true" tabindex="-1"></a>res_df <span class="sc">%&gt;%</span></span>
+<span id="cb60-283"><a href="#cb60-283" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(adj.pvalue)) <span class="sc">%&gt;%</span></span>
+<span id="cb60-284"><a href="#cb60-284" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Label) <span class="sc">%&gt;%</span></span>
+<span id="cb60-285"><a href="#cb60-285" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb60-286"><a href="#cb60-286" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_tested =</span> <span class="fu">n</span>(),</span>
+<span id="cb60-287"><a href="#cb60-287" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_sig    =</span> <span class="fu">sum</span>(adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb60-288"><a href="#cb60-288" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_up     =</span> <span class="fu">sum</span>(adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span> <span class="sc">&amp;</span> log2FC <span class="sc">&gt;</span> <span class="dv">0</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb60-289"><a href="#cb60-289" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_down   =</span> <span class="fu">sum</span>(adj.pvalue <span class="sc">&lt;</span> <span class="fl">0.05</span> <span class="sc">&amp;</span> log2FC <span class="sc">&lt;</span> <span class="dv">0</span>, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb60-290"><a href="#cb60-290" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups  =</span> <span class="st">"drop"</span></span>
+<span id="cb60-291"><a href="#cb60-291" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb60-292"><a href="#cb60-292" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb60-293"><a href="#cb60-293" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-294"><a href="#cb60-294" aria-hidden="true" tabindex="-1"></a><span class="fu">## Reload comparison results (if re-running from this point)</span></span>
+<span id="cb60-295"><a href="#cb60-295" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb60-296"><a href="#cb60-296" aria-hidden="true" tabindex="-1"></a><span class="in">```{r eval=FALSE}</span></span>
+<span id="cb60-297"><a href="#cb60-297" aria-hidden="true" tabindex="-1"></a><span class="in">test_results &lt;- qs_read(file.path(objects_dir, "comparison_results.qs2"))</span></span>
+<span id="cb60-298"><a href="#cb60-298" aria-hidden="true" tabindex="-1"></a><span class="in">res_df       &lt;- as.data.table(test_results$ComparisonResult)</span></span>
+<span id="cb60-299"><a href="#cb60-299" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
 </code><button title="Copy to Clipboard" class="code-copy-button" data-in-quarto-modal=""><i class="bi"></i></button></pre></div>
 </div></div></div></div></div>
 </div> <!-- /content -->

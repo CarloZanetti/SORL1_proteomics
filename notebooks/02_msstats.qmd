@@ -13,13 +13,15 @@ library(ggplot2)
 library(ggrepel)
 library(tidyverse)
 library(readr)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
 ```
 
 ## Set directories
 
 ```{r}
 base_dir    <- "/nemo/lab/destrooperb/home/shared/zanettc/dom_proteomics"
-run_num     <- "run1"
+run_num     <- "run2"
 
 results_dir <- file.path(base_dir, "results", run_num)
 objects_dir <- file.path(base_dir, "data", "processed", run_num)
@@ -77,6 +79,27 @@ raw_spectronaut <- fread(
   select = msstats_cols
 )
 cat("Rows loaded:", nrow(raw_spectronaut), "\n")
+```
+
+## Filter to human proteins
+
+The Spectronaut search used a concatenated human + mouse FASTA (see notebook 04).
+Retain only rows whose primary protein group accession maps to `org.Hs.eg.db` so
+that mouse host-derived proteins are excluded before MSstats sees the data.
+
+```{r}
+prim_acc  <- str_extract(raw_spectronaut$PG.ProteinGroups, "^[^;]+")
+human_map <- mapIds(org.Hs.eg.db, unique(prim_acc),
+                   "SYMBOL", "UNIPROT", multiVals = "first")
+human_acc <- names(human_map)[!is.na(human_map)]
+
+n_pg_before <- uniqueN(raw_spectronaut$PG.ProteinGroups)
+raw_spectronaut <- raw_spectronaut[prim_acc %in% human_acc]
+n_pg_after  <- uniqueN(raw_spectronaut$PG.ProteinGroups)
+
+cat("Protein groups before human filter:", n_pg_before, "\n")
+cat("Protein groups after  human filter:", n_pg_after,  "\n")
+cat("Mouse protein groups removed:      ", n_pg_before - n_pg_after, "\n")
 
 qs_save(raw_spectronaut, file.path(objects_dir, "msstats_report.qs2"))
 ```

@@ -20,7 +20,7 @@ library(org.Hs.eg.db)
 
 ```{r}
 base_dir    <- "/nemo/lab/destrooperb/home/shared/zanettc/dom_proteomics"
-run_num     <- "run1"
+run_num     <- "run2"
 
 results_dir <- file.path(base_dir, "results", run_num)
 objects_dir <- file.path(base_dir, "data", "processed", run_num)
